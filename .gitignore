@@ -1,0 +1,19 @@
+# Runtime workspace — generated at run time, not source
+fleet-workspace/iteration-*/
+fleet-workspace/summary.md
+fleet-workspace/proposals/dhira-summary-*.md
+fleet-workspace/proposals/*.md
+
+# Keep the proposals index and directory structure
+!fleet-workspace/proposals/index.md
+!fleet-workspace/.gitkeep
+!fleet-workspace/proposals/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
