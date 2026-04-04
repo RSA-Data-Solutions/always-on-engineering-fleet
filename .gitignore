@@ -1,19 +1,32 @@
-# Runtime workspace — generated at run time, not source
-fleet-workspace/iteration-*/
-fleet-workspace/summary.md
-fleet-workspace/proposals/dhira-summary-*.md
-fleet-workspace/proposals/*.md
+# === Credentials / Secrets ===
+# Context files that contain passwords, API keys, or IBM i credentials
+contexts/ibmimcp.md
+contexts/inova.md
 
-# Keep the proposals index and directory structure
-!fleet-workspace/proposals/index.md
-!fleet-workspace/.gitkeep
-!fleet-workspace/proposals/.gitkeep
+# Keep self-improvement context (no secrets)
+!contexts/self-improvement.md
 
-# OS
+# === Fleet Runtime State ===
+# Workspace is runtime state — regenerated each run, not source of truth
+fleet-workspace/
+
+# === Node.js ===
+node_modules/
+dist/
+*.js.map
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# === OS / Editor ===
 .DS_Store
-Thumbs.db
-
-# Editor
-.vscode/
-.idea/
+.env
+.env.*
 *.swp
+*.swo
+.idea/
+.vscode/
