@@ -1,8 +1,8 @@
 ---
 name: engineering-fleet
 description: >
-  Deploy an Always-On Software Engineering Fleet — four AI agents (CTO, QA Engineer,
-  Software Engineer, and Dhira the Research Agent) that autonomously discover, build,
+  Deploy an Always-On Software Engineering Fleet — four AI agents (Ram, Lynn, Sam,
+  and Dhira the Research Agent) that autonomously discover, build,
   test, fix, and ship software in a continuous loop. Use this skill whenever the user
   wants to automate software quality improvement, run a fix-test-push cycle, discover
   new tool ideas from community pain points, set up autonomous agents to work on bugs
@@ -14,16 +14,16 @@ description: >
 
 # Always-On Software Engineering Fleet
 
-Four specialised agents work together to discover, build, test, fix, and ship software
-across multiple projects. Two loops run in parallel: a **fix loop** (QA → SE → push) and
-a **discovery loop** (Dhira → CTO review → SE build → QA test → release).
+Five specialised agents work together to discover, build, test, deploy, and ship software
+across multiple projects. Two loops run in parallel: a **fix loop** (QA → SE → DevOps → QA → push) and
+a **discovery loop** (Dhira → Ram review → SE build → DevOps deploy → QA test → release).
 
 ```
 Dhira (Research Agent) ── daily ──→ proposals/ ──→ CTO review
                                                          │
-CTO (orchestrator)                              approve / reject
- ├─ fix loop:       QA → analyze → SE(s) → retest → push    │
- └─ build loop: approved proposal → SE builds → QA tests → release
+Ram (orchestrator)                              approve / reject
+ ├─ fix loop:   QA → analyze → SE(s) → DevOps → QA → push    │
+ └─ build loop: approved proposal → SE builds → DevOps → QA → release
 ```
 
 The fleet is **project-agnostic** — swap the context file to target a different project.
@@ -32,15 +32,20 @@ The fleet is **project-agnostic** — swap the context file to target a differen
 
 ## Agents
 
-- **CTO** — Orchestrator. Reads context, manages both loops, reviews Dhira's proposals,
+- **Ram** — Orchestrator. Reads context, manages both loops, reviews Dhira's proposals,
   analyzes bug dependencies, decides parallelism, controls git (push, rollback, release),
   pauses for budget.
-- **QA Engineer** — Tester. Runs the project's test suite, captures structured results,
-  classifies failures, tests newly built tools before release.
-- **Software Engineer** — Builder & Fixer. Receives bug assignments or new tool builds,
-  reads relevant code, makes targeted changes, verifies locally, reports back to CTO.
+- **Aaron** — Deployment owner. Kills stale server processes, builds from source,
+  starts the server, runs health checks and endpoint smoke tests, verifies registered tool
+  count, and communicates a READY/FAILED status to the fleet before QA runs. QA always
+  tests against a server Aaron (DevOps) has certified.
+- **Lynn** — Tester. Runs the project's test suite, captures structured results,
+  classifies failures, tests newly built tools before release. When `server_already_running`
+  is true, skips server setup and tests against the DevOps-certified instance.
+- **Sam** — Builder & Fixer. Receives bug assignments or new tool builds,
+  reads relevant code, makes targeted changes, verifies locally, reports back to Ram.
 - **Dhira** — Research Agent. Searches developer communities for pain points, identifies
-  gaps in the target project's toolset, writes structured proposals for the CTO to review.
+  gaps in the target project's toolset, writes structured proposals for Ram to review.
 
 ---
 
@@ -52,26 +57,27 @@ The fleet is **project-agnostic** — swap the context file to target a differen
    - `contexts/inova.md` — iNova agentic IDE platform (Docker / Python / Next.js)
    - `contexts/self-improvement.md` — The fleet improves its own agent instructions
 
-2. **Read `agents/cto.md`** — it is the CTO's full operating manual. Launch the CTO as a
+2. **Read `agents/ram.md`** — it is Ram's full operating manual. Launch Ram as a
    subagent, passing:
    - the path to this `SKILL.md`
    - the path to the project context file
    - the iteration cap (default: 10)
    - any human instructions (e.g. "focus on SQL tools only", "don't touch authentication")
 
-3. **The CTO runs the loop.** It communicates progress by writing artefact files to
+3. **Ram runs the loop.** It communicates progress by writing artefact files to
    `fleet-workspace/iteration-N/`. Watch progress there.
 
 4. **When the fleet pauses** (budget low, unresolvable failure, or all tests passing),
-   the CTO writes a summary to `fleet-workspace/summary.md` and notifies you.
+   Ram writes a summary to `fleet-workspace/summary.md` and notifies you.
 
 ---
 
 ## Agent instruction files
 
-- `agents/cto.md` — Full CTO operating manual
-- `agents/qa-engineer.md` — QA Engineer instructions
-- `agents/software-engineer.md` — Software Engineer instructions
+- `agents/ram.md` — Full CTO operating manual
+- `agents/aaron.md` — DevOps Engineer instructions (deploy, health check, smoke test)
+- `agents/lynn.md` — QA Engineer instructions
+- `agents/sam.md` — Software Engineer instructions
 - `agents/dhira.md` — Research Agent instructions
 
 ---
@@ -116,7 +122,7 @@ fleet-workspace/
 
 ## Dependency-aware parallelism
 
-The CTO analyses failing tests before spawning SEs:
+Ram analyses failing tests before spawning SEs:
 
 1. Build a dependency graph: does fixing bug A require first fixing bug B?
 2. Independent bugs → spawn parallel SE subagents (one per bug or cluster)
@@ -126,7 +132,7 @@ The CTO analyses failing tests before spawning SEs:
 
 ## Budget awareness
 
-Before each iteration the CTO checks remaining capacity. If insufficient for another full
+Before each iteration Ram checks remaining capacity. If insufficient for another full
 loop, it writes a pause summary and waits for human authorisation to continue.
 
 ---
@@ -135,7 +141,7 @@ loop, it writes a pause summary and waits for human authorisation to continue.
 
 **Fix loop (bugs only):**
 ```
-CTO context_file: contexts/ibmimcp.md
+Ram context_file: contexts/ibmimcp.md
 max_iterations: 5
 human_instructions: "Fix failing tools. Do not touch compile tools."
 ```
@@ -149,7 +155,7 @@ human_instructions: "Search today's IBM i communities. Focus on debugging pain."
 
 **Full fleet — iNova:**
 ```
-CTO context_file: contexts/inova.md
+Ram context_file: contexts/inova.md
 max_iterations: 10
 enable_research: true
 human_instructions: "Fix all failing tests. Run Dhira for new feature ideas."
@@ -157,7 +163,7 @@ human_instructions: "Fix all failing tests. Run Dhira for new feature ideas."
 
 **Self-improvement run:**
 ```
-CTO context_file: contexts/self-improvement.md
+Ram context_file: contexts/self-improvement.md
 max_iterations: 3
 human_instructions: "Review past iteration summaries. Improve agent clarity and coverage."
 ```

@@ -67,7 +67,7 @@ The QA Engineer reports failures from the validation script, plus any of these p
 found by manual review:
 
 - **Broken reference** — a file path, section, or field mentioned in one agent file
-  doesn't exist (e.g. `agents/cto.md` says to read `contexts/ibmimcp.md` but the file
+  doesn't exist (e.g. `agents/ram.md` says to read `contexts/ibmimcp.md` but the file
   moved)
 - **Stale instruction** — an instruction references a command, column name, or tool that
   no longer exists in the target project

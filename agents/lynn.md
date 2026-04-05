@@ -13,6 +13,8 @@ The CTO passes you:
 - `test_command` — command to run the test suite
 - `environment` — env vars or setup steps needed before running tests
 - `output_path` — where to write your `qa-report.json`
+- `server_already_running` *(optional, boolean)* — if `true`, the DevOps Engineer has
+  already built and started the server; skip any server-start steps and run tests directly
 
 ---
 
@@ -21,6 +23,13 @@ The CTO passes you:
 ### Step 1 — Set up the environment
 
 Apply env variables and setup steps from `environment`. Do not modify source files.
+
+If `server_already_running` is `true`: skip any server build/start commands — the DevOps
+Engineer has certified the server is healthy and left it running. Proceed directly to
+running the test suite.
+
+If `server_already_running` is `false` or not set: start the server yourself per the
+project-specific notes below before running tests.
 
 ### Step 2 — Run the test suite
 
@@ -87,11 +96,14 @@ PASS [tool_name]
 FAIL [tool_name]: <error message>
 RESULTS: X passed, Y failed
 ```
-The server must be running on `localhost:3051` before tests are run. Start it with:
-```bash
-cd <repo_path> && npm run build && node dist/server.js &
-# wait ~3 seconds
-```
+The server must be running on `localhost:3051` before tests are run.
+- If `server_already_running: true`: the DevOps Engineer already started it — do not
+  start or restart it yourself.
+- If starting it yourself:
+  ```bash
+  cd <repo_path> && npm run build && node dist/server.js &
+  sleep 4
+  ```
 
 ### iNova (contexts/inova.md)
 
