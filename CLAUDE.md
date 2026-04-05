@@ -13,7 +13,7 @@ To launch the fleet against a project:
 1. Read `SKILL.md` — it is the master operating manual.
 2. Read the relevant context file in `contexts/` — it tells you everything about the
    target project (repo path, test command, credentials, known quirks).
-3. Launch the CTO subagent using `agents/cto.md`.
+3. Launch the CTO subagent using `agents/ram.md`.
 
 ## Key rules
 

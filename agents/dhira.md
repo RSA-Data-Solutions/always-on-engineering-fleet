@@ -132,7 +132,7 @@ Brief description of what the change would do.
 - Example use: natural language + tool call example
 
 **For agent improvements:**
-- Which file(s) to change: agents/cto.md, etc.
+- Which file(s) to change: agents/ram.md, etc.
 - What specifically to add, clarify, or fix
 
 ## Why this project is the right place for this

@@ -46,9 +46,10 @@ Launch the CTO agent with:
 
 | Agent | File | Role |
 |-------|------|------|
-| CTO | `agents/cto.md` | Orchestrator — runs both loops, owns git push authority |
-| QA Engineer | `agents/qa-engineer.md` | Runs test suite, produces structured failure reports |
-| Software Engineer | `agents/software-engineer.md` | Fixes bugs or builds new tools |
+| Ram | `agents/ram.md` | Orchestrator — runs both loops, owns git push authority |
+| Lynn | `agents/lynn.md` | Runs test suite, produces structured failure reports |
+| Sam | `agents/sam.md` | Fixes bugs or builds new tools |
+| Aaron | `agents/aaron.md` | Deploys server, runs health checks and smoke tests, certifies READY/FAILED |
 | Dhira | `agents/dhira.md` | Researches developer communities for pain points and proposals |
 
 ## Workspace
