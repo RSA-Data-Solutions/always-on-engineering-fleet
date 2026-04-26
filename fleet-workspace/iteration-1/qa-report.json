@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-04-26T21:52:00Z",
+  "routine": 4,
+  "repo_path": "RSA-Data-Solutions/iNova",
+  "commit": "6cd420def5a2ce029c056d6a00b754998832650d",
+  "test_command": "python -m pytest ui_journey/ -v --json-report --json-report-file=/tmp/regression-report.json",
+  "base_url": "https://inovaide.com",
+  "exit_code": 0,
+  "duration_seconds": 0.85,
+  "summary": {
+    "total": 5,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 5,
+    "new_tickets": 0,
+    "regressions": 0
+  },
+  "passing_tests": [],
+  "failing_tests": [],
+  "skipped_tests": [
+    {
+      "name": "test_p0_listTables",
+      "nodeid": "ui_journey/test_p0_suite.py::test_p0_listTables",
+      "reason": "QA_TENANT_SMOKE_PASSWORD not set — authenticated tests cannot run"
+    },
+    {
+      "name": "test_p0_runSQL",
+      "nodeid": "ui_journey/test_p0_suite.py::test_p0_runSQL",
+      "reason": "QA_TENANT_SMOKE_PASSWORD not set — authenticated tests cannot run"
+    },
+    {
+      "name": "test_p0_getUserProfile",
+      "nodeid": "ui_journey/test_p0_suite.py::test_p0_getUserProfile",
+      "reason": "QA_TENANT_SMOKE_PASSWORD not set — authenticated tests cannot run"
+    },
+    {
+      "name": "test_rotation_batch",
+      "nodeid": "ui_journey/test_rotation.py::test_rotation_batch",
+      "reason": "QA_TENANT_EXPLORE_PASSWORD not set"
+    },
+    {
+      "name": "test_full_signup_to_first_tool_call",
+      "nodeid": "ui_journey/test_signup.py::test_full_signup_to_first_tool_call",
+      "reason": "QA_BYPASS_SECRET not set — fresh-signup tests cannot run"
+    }
+  ],
+  "p95_latencies": {},
+  "baseline_comparison": "baseline_metrics.json is empty — no P95 comparison possible",
+  "baseline_update_eligible": false,
+  "baseline_update_reason": "0 tests passed; suite ran but produced no pass data. Baseline NOT updated.",
+  "tickets_filed": [],
+  "environment_issues": [
+    {
+      "type": "missing_credentials",
+      "detail": "QA_TENANT_SMOKE_PASSWORD, QA_TENANT_EXPLORE_PASSWORD, and QA_BYPASS_SECRET are not set in the runner environment. All 5 tests skipped. To run the full suite, these must be injected as GitHub Actions secrets or set in the runner's .env."
+    }
+  ],
+  "notes": "Suite infrastructure confirmed working (venv, playwright install, pytest collection all succeeded). Zero failures, zero regressions — but also zero actual test coverage because credentials are absent. This is a runner configuration gap, not a product failure. STEP 4 (baseline refresh) skipped — only eligible on full green. STEP 5 skipped — commit message contains no 'Fixes #N'."
+}
