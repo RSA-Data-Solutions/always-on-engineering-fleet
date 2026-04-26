@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Install:
+    1) chmod +x scripts/watchdog/qa-heartbeat-check.sh
+    2) sudo cp scripts/watchdog/qa-heartbeat-check.sh /usr/local/bin/
+    3) cp scripts/watchdog/com.sashi.qafleet.watchdog.plist ~/Library/LaunchAgents/
+    4) launchctl load ~/Library/LaunchAgents/com.sashi.qafleet.watchdog.plist
+    5) launchctl start com.sashi.qafleet.watchdog   (run once to verify)
+
+  Logs go to ~/Library/Logs/qa-watchdog.{out,err}.log
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.sashi.qafleet.watchdog</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/qa-heartbeat-check.sh</string>
+    </array>
+
+    <!-- Run every 15 minutes -->
+    <key>StartInterval</key>
+    <integer>900</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Optional: pass Slack webhook to the script via env -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>FLEET_DIR</key>
+        <string>/Users/Sashi/Documents/projects/always-on-engineering-fleet</string>
+        <key>SLACK_WEBHOOK_URL</key>
+        <string></string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/Sashi/Library/Logs/qa-watchdog.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/Sashi/Library/Logs/qa-watchdog.err.log</string>
+</dict>
+</plist>
