@@ -1,0 +1,3 @@
+# qa-smoke-hourly heartbeat log
+# Format: {UTC-ISO-timestamp}  status={status}  tools_passed={N}/12
+# Written by Routine 1 after every run. Missing entries = silent failure.
