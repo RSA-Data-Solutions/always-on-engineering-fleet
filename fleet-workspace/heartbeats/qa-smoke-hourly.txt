@@ -1,0 +1,5 @@
+# qa-smoke-hourly heartbeat
+# Format: one UTC ISO-8601 timestamp per line, appended by each routine run.
+# Watchdog alert threshold: 90 minutes since last line.
+# This file was seeded at routine configuration time; the first real
+# timestamp will be written by the routine on its first scheduled run.
