@@ -50,3 +50,11 @@
 |------|-------|----------|--------|-------------|
 | 2026-04-25 | listFileMemberStats — Physical File Member Statistics & Reorganization Advisor | High | Approved | QSYS2.SYSMEMBERSTAT; source/ category; ~110 lines |
 | 2026-04-25 | inspectUncommittedTransactions — Uncommitted Database Transaction Inspector | High | Approved | QSYS2.DB_TRANSACTION_INFO + DB_TRANSACTION_OBJECT_INFO; operator/ category; ~140 lines |
+
+## Today's Proposals (2026-04-27)
+
+| Date | Title | Priority | Status | CTO Outcome |
+|------|-------|----------|--------|-------------|
+| 2026-04-27 | deploymentDriftMonitor — IBMiMCP Cross-Environment Deployment Drift Monitor | High | Awaiting CTO Review | |
+| 2026-04-27 | orchestratorDockerGracefulDegradation — iNova Orchestrator Graceful Docker Degradation | High | Awaiting CTO Review | |
+| 2026-04-27 | listAvailablePASEPackages — PASE Open Source Package Discovery Tool | Medium | Awaiting CTO Review | |

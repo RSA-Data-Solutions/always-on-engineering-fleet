@@ -1,0 +1,1 @@
+2026-04-27T10:05:00Z  routine=qa-explore-daily  phase_a=3-proposals  phase_b=sunday-batch-refresh-pr-opened
