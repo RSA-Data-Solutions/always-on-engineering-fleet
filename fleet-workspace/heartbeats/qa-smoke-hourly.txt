@@ -1,0 +1,11 @@
+# qa-smoke-hourly heartbeat
+# Written by the routine at the end of each successful run.
+# The external watchdog (scripts/watchdog/qa-heartbeat-check.sh) reads
+# this file; a missing or stale entry triggers a watchdog alert.
+#
+# Format: ISO 8601 UTC timestamp written by:
+#   date -u +"%Y-%m-%dT%H:%M:%SZ" > fleet-workspace/heartbeats/qa-smoke-hourly.txt
+#
+# This placeholder was written at routine initialisation.
+# Stale threshold: 75 minutes (1h cadence + 15m grace).
+INITIALIZED 2026-04-27T00:00:00Z

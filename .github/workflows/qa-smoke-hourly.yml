@@ -1,0 +1,59 @@
+# Fires the qa-smoke-hourly Claude Code routine on a cron schedule.
+# Runs at :05 past every hour, 07:00–23:00 UTC, to avoid the
+# pub400.com maintenance window (03:00–04:00 UTC).
+#
+# Required secrets (set in repo Settings → Secrets → Actions):
+#   QA_SMOKE_HOURLY_ROUTINE_URL    — API trigger URL from the routines panel
+#   QA_SMOKE_HOURLY_ROUTINE_TOKEN  — Bearer token from the routines panel
+
+name: QA Smoke — Hourly P0
+
+on:
+  schedule:
+    - cron: '5 7-23 * * *'
+  workflow_dispatch:  # allow manual trigger for testing
+
+jobs:
+  fire-routine:
+    name: Fire qa-smoke-hourly routine
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate secrets present
+        run: |
+          if [[ -z "${{ secrets.QA_SMOKE_HOURLY_ROUTINE_URL }}" ]]; then
+            echo "::error::QA_SMOKE_HOURLY_ROUTINE_URL secret is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+          if [[ -z "${{ secrets.QA_SMOKE_HOURLY_ROUTINE_TOKEN }}" ]]; then
+            echo "::error::QA_SMOKE_HOURLY_ROUTINE_TOKEN secret is not set. Add it in Settings → Secrets → Actions."
+            exit 1
+          fi
+
+      - name: Fire routine
+        env:
+          ROUTINE_FIRE_URL: ${{ secrets.QA_SMOKE_HOURLY_ROUTINE_URL }}
+          ROUTINE_FIRE_TOKEN: ${{ secrets.QA_SMOKE_HOURLY_ROUTINE_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST "$ROUTINE_FIRE_URL" \
+            -H "Authorization: Bearer $ROUTINE_FIRE_TOKEN" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "anthropic-beta: experimental-cc-routine-2026-04-01" \
+            -H "Content-Type: application/json" \
+            -d '{"text": "qa-smoke-hourly"}')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [[ "$HTTP_CODE" -lt 200 || "$HTTP_CODE" -ge 300 ]]; then
+            echo "::error::Routine trigger failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "Routine qa-smoke-hourly fired successfully at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
