@@ -1,0 +1,5 @@
+# qa-smoke-hourly heartbeat
+# Written by Routine 1 at the end of each successful run.
+# Format: one UTC ISO-8601 timestamp per line, appended each run.
+# The external watchdog checks this file; a missing or stale entry
+# (older than 70 minutes) indicates a silent routine failure.
