@@ -1,0 +1,3 @@
+# Initialised — will be overwritten with UTC timestamp by qa-smoke-hourly routine on first run.
+# Format: 2026-04-27T14:05:32Z
+# Watchdog: alert if timestamp is older than 2 hours or file is missing.
