@@ -1,0 +1,4 @@
+# qa-smoke-hourly heartbeat
+# Each run appends one UTC ISO-8601 timestamp line.
+# External watchdog alerts if this file is not updated within ~70 minutes.
+# Initialized: 2026-04-27T00:00:00Z (placeholder — first real run will append below)
