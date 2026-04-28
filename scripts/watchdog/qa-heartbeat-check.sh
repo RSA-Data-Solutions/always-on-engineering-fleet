@@ -15,7 +15,9 @@ set -euo pipefail
 FLEET_DIR="${FLEET_DIR:-/Users/Sashi/Documents/projects/always-on-engineering-fleet}"
 HEARTBEAT_DIR="$FLEET_DIR/fleet-workspace/heartbeats"
 LOG_FILE="$FLEET_DIR/fleet-workspace/watchdog.log"
-SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"  # optional — leave blank to skip
+SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"       # optional — leave blank to skip
+TELEGRAM_BOT_TOKEN="${TELEGRAM_BOT_TOKEN:-}"   # optional — Telegram bot token
+TELEGRAM_CHAT_ID="${TELEGRAM_CHAT_ID:-}"       # optional — Telegram chat/user ID
 
 mkdir -p "$HEARTBEAT_DIR"
 mkdir -p "$(dirname "$LOG_FILE")"
@@ -35,6 +37,16 @@ notify_slack() {
     "$SLACK_WEBHOOK_URL" >/dev/null || true
 }
 
+notify_telegram() {
+  [[ -z "$TELEGRAM_BOT_TOKEN" || -z "$TELEGRAM_CHAT_ID" ]] && return 0
+  local message="$1"
+  curl -sS -X POST \
+    "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+    -H "Content-Type: application/json" \
+    --data "{\"chat_id\":\"${TELEGRAM_CHAT_ID}\",\"text\":\"🚨 QA Fleet\n${message}\",\"parse_mode\":\"HTML\"}" \
+    >/dev/null || true
+}
+
 log() {
   echo "$(now_iso) $1" | tee -a "$LOG_FILE"
 }
@@ -47,6 +59,7 @@ check_age() {
     log "$msg"
     notify_mac "QA Fleet alert" "$name has never run" "$msg"
     notify_slack "$msg"
+    notify_telegram "$msg"
     return
   fi
 
@@ -61,6 +74,7 @@ check_age() {
     log "$msg"
     notify_mac "QA Fleet alert" "$name is silent" "$msg"
     notify_slack "$msg"
+    notify_telegram "$msg"
   else
     log "OK $name (age=${age_sec}s)"
   fi

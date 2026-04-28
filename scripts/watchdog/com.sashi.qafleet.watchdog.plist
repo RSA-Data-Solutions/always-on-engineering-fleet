@@ -35,6 +35,10 @@
         <string>/Users/Sashi/Documents/projects/always-on-engineering-fleet</string>
         <key>SLACK_WEBHOOK_URL</key>
         <string></string>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string></string>
+        <key>TELEGRAM_CHAT_ID</key>
+        <string></string>
     </dict>
 
     <key>StandardOutPath</key>
