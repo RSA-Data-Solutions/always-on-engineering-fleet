@@ -25,6 +25,7 @@ mkdir -p "$(dirname "$LOG_FILE")"
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 
 notify_mac() {
+  [[ "$(uname)" != "Darwin" ]] && return 0
   local title="$1" subtitle="$2" message="$3"
   osascript -e "display notification \"$message\" with title \"$title\" subtitle \"$subtitle\" sound name \"Basso\"" 2>/dev/null || true
 }
@@ -64,8 +65,11 @@ check_age() {
   fi
 
   local mtime now age_sec
-  # macOS stat syntax (different from Linux)
-  mtime=$(stat -f %m "$file")
+  if [[ "$(uname)" == "Darwin" ]]; then
+    mtime=$(stat -f %m "$file")
+  else
+    mtime=$(stat -c %Y "$file")
+  fi
   now=$(date +%s)
   age_sec=$(( now - mtime ))
 
