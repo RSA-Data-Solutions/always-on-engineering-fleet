@@ -1,0 +1,5 @@
+2026-04-28T00:00:00Z
+routine=qa-smoke-hourly
+outcome=INITIALIZED
+p0_pass=0/12
+tickets_filed=0
