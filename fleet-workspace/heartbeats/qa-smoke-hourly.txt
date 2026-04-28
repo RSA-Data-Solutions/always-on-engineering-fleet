@@ -1,0 +1,6 @@
+# qa-smoke-hourly heartbeat
+# Written by Ram at the end of each successful hourly smoke run.
+# Format: one UTC timestamp per line (ISO 8601).
+# External watchdog: alert if newest line is older than 75 minutes.
+#
+# --- runtime entries below ---
