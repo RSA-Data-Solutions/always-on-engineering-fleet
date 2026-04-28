@@ -1,0 +1,14 @@
+# qa-smoke-hourly heartbeat log
+# Written by Routine 1 on each run. Format:
+#   {ISO_UTC_timestamp}
+#   routine=1 outcome={GREEN|FAILED_AARON_GATE|P0_OPEN|DEGRADATION|TIMEOUT}
+#   p0_pass={N} p0_fail={N} p0_total=12
+#   failing_tools={comma-separated names, or NONE}
+#   tickets_filed={N} fixes_pushed={N}
+# -----------------------------------------------------------------------
+# SEEDED — routine has not run yet. Watchdog: do not alert before first run.
+2026-04-28T00:00:00Z
+routine=1 outcome=SEEDED
+p0_pass=0 p0_fail=0 p0_total=12
+failing_tools=NONE
+tickets_filed=0 fixes_pushed=0
