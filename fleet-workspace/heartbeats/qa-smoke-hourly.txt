@@ -1,0 +1,6 @@
+# qa-smoke-hourly heartbeat log
+# Format: {ISO-UTC-timestamp} | passed={N} failed={N} code_bug={N} env={N} flaky={N} fixed={N} pushed={sha|none} p0_open={true|false} | failing_tools={tool1,tool2|none}
+# Watchdog alarm threshold: 70 minutes between entries
+#
+# Seed entry — routine not yet executed
+2026-04-28T00:00:00Z | passed=0 failed=0 code_bug=0 env=0 flaky=0 fixed=0 pushed=none p0_open=false | failing_tools=none
