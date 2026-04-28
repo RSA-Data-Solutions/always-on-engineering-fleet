@@ -1,0 +1,4 @@
+2026-04-28T00:24:00Z
+routine=1 name=qa-smoke-hourly
+status=INITIALIZED
+note=Placeholder written at routine creation. First real heartbeat written by Ram on next scheduled run (5 7-23 * * *).
