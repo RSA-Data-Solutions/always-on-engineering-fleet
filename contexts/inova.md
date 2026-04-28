@@ -124,3 +124,59 @@ Unless overridden at fleet launch:
 
 **Research focus:** Gaps in iNova's agentic workflow. High priority: context management,
 multi-agent coordination, IBM i integration, developer UX friction, deployment automation.
+
+---
+
+## P0 Tool Suite
+
+Tools tested in **every smoke run** (Routine 1). Excluded from `rotation_batches` below
+so they are not double-counted in the daily rotation. Add a tool here when it is
+certified as business-critical and must never regress overnight.
+
+```yaml
+P0_tool_suite:
+  - listTables
+  - runSQL
+  # Add further P0 tools here as they are certified
+```
+
+---
+
+## Rotation testing (for Routine 3)
+
+### `ui_journey_rotation_command`
+
+Run against **Aaron's locally deployed IBMiMCP staging server** (`http://localhost:3051`),
+not the live `inovaide.com` site. Aaron must certify the server (STEP 3 of Routine 3)
+before this command is invoked.
+
+```bash
+cd {iNova}/qa
+source .venv/bin/activate
+QA_HEADLESS=true \
+QA_BASE_URL=http://localhost:3051 \
+QA_TENANT_EXPLORE_PASSWORD=$QA_TENANT_EXPLORE_PASSWORD \
+  python -m pytest ui_journey/test_rotation.py -v \
+  --rotation-day=$(date +%A) \
+  --json-report --json-report-file=/tmp/rotation-report.json
+```
+
+### `rotation_batches`
+
+Populated by the **Sunday weekly refresh** (STEP 7 of Routine 3). Each entry lists
+IBMiMCP tool names to test on that day. Tools in `P0_tool_suite` above are excluded
+— they are covered by Routine 1 smoke tests instead.
+
+On a fresh install all batches are empty. The first Sunday refresh fills them in.
+Do not edit this section manually — let STEP 7 manage it.
+
+```yaml
+rotation_batches:
+  Monday:    []
+  Tuesday:   []
+  Wednesday: []
+  Thursday:  []
+  Friday:    []
+  Saturday:  []
+  Sunday:    []
+```
