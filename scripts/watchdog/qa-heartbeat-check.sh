@@ -67,6 +67,6 @@ check_age() {
 }
 
 # Thresholds (seconds). Set to ~2× the routine's expected interval.
-check_age "qa-smoke-hourly"  "$HEARTBEAT_DIR/qa-smoke-hourly.txt"  7200    # 2h
+check_age "qa-smoke-90min"   "$HEARTBEAT_DIR/qa-smoke-90min.txt"   10800   # 3h (2× the 90-min interval)
 check_age "qa-signup-daily"  "$HEARTBEAT_DIR/qa-signup-daily.txt"  129600  # 36h
 check_age "qa-explore-daily" "$HEARTBEAT_DIR/qa-explore-daily.txt" 129600  # 36h
