@@ -1,0 +1,5 @@
+# qa-smoke-hourly heartbeat
+# Format: <UTC ISO timestamp> [outcome] [notes]
+# Written by Routine 1 at the end of each successful run.
+# Watchdog alert threshold: stale if not updated within 75 minutes.
+# (placeholder — updated by first routine run)
