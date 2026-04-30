@@ -1,1 +1,2 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
+2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
