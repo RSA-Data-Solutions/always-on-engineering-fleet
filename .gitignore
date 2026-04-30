@@ -9,6 +9,10 @@ contexts/inova.md
 # === Fleet Runtime State ===
 # Workspace is runtime state — regenerated each run, not source of truth
 fleet-workspace/
+# Heartbeats are a persistent audit trail — keep them tracked
+!fleet-workspace/
+!fleet-workspace/heartbeats/
+!fleet-workspace/heartbeats/**
 
 # === Node.js ===
 node_modules/
