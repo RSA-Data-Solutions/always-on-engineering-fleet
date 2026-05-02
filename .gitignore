@@ -8,7 +8,10 @@ contexts/inova.md
 
 # === Fleet Runtime State ===
 # Workspace is runtime state — regenerated each run, not source of truth
-fleet-workspace/
+# (heartbeats are the exception — they are durable signal and must be committed)
+fleet-workspace/iteration-*/
+fleet-workspace/summary.md
+fleet-workspace/proposals/
 
 # === Node.js ===
 node_modules/
