@@ -1,2 +1,3 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
 2026-05-02T08:07:51Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7(dedup)  step=signup  error=env_problem:ERR_CERT_AUTHORITY_INVALID
+2026-05-04T08:20:20Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7(dedup)  step=browser_launch  error=env_problem:playwright_chromium_missing+host_not_in_allowlist  dedup_hash=71a1488df7d3
