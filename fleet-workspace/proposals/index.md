@@ -50,3 +50,11 @@
 |------|-------|----------|--------|-------------|
 | 2026-04-25 | listFileMemberStats — Physical File Member Statistics & Reorganization Advisor | High | Approved | QSYS2.SYSMEMBERSTAT; source/ category; ~110 lines |
 | 2026-04-25 | inspectUncommittedTransactions — Uncommitted Database Transaction Inspector | High | Approved | QSYS2.DB_TRANSACTION_INFO + DB_TRANSACTION_OBJECT_INFO; operator/ category; ~140 lines |
+
+## Today's Proposals (2026-05-05)
+
+| Date | Title | Priority | Status | CTO Outcome |
+|------|-------|----------|--------|-------------|
+| 2026-05-05 | getIBMiBobContext — IBM Bob iMode Bridge Context Bundle | High | Awaiting CTO Review | |
+| 2026-05-05 | run5250Session — Virtual 5250 Terminal Session Execution | High | Awaiting CTO Review | |
+| 2026-05-05 | ACP/A2A Protocol Convergence — IBMiMCP Compatibility Tracking | Medium | Awaiting CTO Review | |
