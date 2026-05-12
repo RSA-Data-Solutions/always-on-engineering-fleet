@@ -59,3 +59,10 @@
 | 2026-04-30 | getConnectionHealth + JT400 Startup Retry | High | Awaiting CTO Review | |
 | 2026-04-30 | queryTimeout — Per-Tool SQL Query Timeout | Medium | Awaiting CTO Review | |
 | 2026-04-30 | bobCompatibleToolAnnotations — IBM BOB 1.0 Interop | Medium | Awaiting CTO Review | |
+
+## Today's Proposals (2026-05-12)
+
+| Date | Title | Priority | Status | CTO Outcome |
+|------|-------|----------|--------|-------------|
+| 2026-05-12 | analyzePTFCurrency — PTF Risk & Currency Scanner | High | Shipped | Commit bd95424; QSYS2.USER_INFO_PTFS; HIPER/defective/temporary/superseded classification; system/ category |
+| 2026-05-12 | auditUserProfiles — User Profile Security Auditor | High | Shipped | Commit bd95424; QSYS2.USER_INFO; default passwords (CRITICAL) / excessive authority (HIGH) / no expiry (MEDIUM); security/ category |
