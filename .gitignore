@@ -1,4 +1,10 @@
 fleet-workspace/iteration-*/
+fleet-workspace/proposals/
+fleet-workspace/hotfix/
+fleet-workspace/watchdog.log
 __pycache__/
 *.pyc
 .env
+.DS_Store
+.claude/
+scripts/.DS_Store
