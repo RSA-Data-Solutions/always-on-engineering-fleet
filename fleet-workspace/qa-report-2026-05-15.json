@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-05-15T07:35:00Z",
+  "repo_path": "/Users/Sashi/Documents/projects/iNova/qa",
+  "test_command": "python -m pytest ui_journey/test_p0_suite.py -v --json-report --json-report-file=/tmp/p0-report.json",
+  "exit_code": 0,
+  "duration_seconds": 0.92,
+  "summary": {
+    "total": 1,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 1
+  },
+  "passing_tests": [],
+  "failing_tests": [],
+  "skipped_tests": [
+    {
+      "name": "test_p0_listTables",
+      "reason": "QA_TENANT_SMOKE_PASSWORD not set — cannot run authenticated tests"
+    }
+  ],
+  "environment_issues": [
+    {
+      "type": "missing_credentials",
+      "severity": "blocking",
+      "description": "QA_TENANT_SMOKE_PASSWORD environment variable is not set. All P0 tests require authentication as qa-smoke@inovaide-qa.com. 1Password CLI is installed (v2.32.0) but no accounts are configured.",
+      "root_cause": "1Password CLI authentication not configured. Desktop app integration is required or manual account setup needed.",
+      "unblock_action": "Configure 1Password CLI: enable desktop app integration (https://developer.1password.com/docs/cli/app-integration/) or manually add account with 'op account add'",
+      "suggested_files": []
+    }
+  ],
+  "notes": "All P0 smoke tests skipped due to missing QA_TENANT_SMOKE_PASSWORD. This is an env_problem blocker, not a code_bug. No tickets filed. Degradation rule not triggered (0 failures). To unblock: configure 1Password CLI authentication and retrieve password for qa-smoke@inovaide-qa.com from 1Password vault, then re-run tests."
+}
