@@ -38,4 +38,34 @@ Both tools are read-only, require no confirmation, and return structured finding
 
 ---
 
-**Fleet Status:** Idle, awaiting next run.
+---
+
+## ⚠️ CRITICAL: Sasi Agent Systematic Failure (2026-05-14)
+
+**Four consecutive Sasi agent runs have hung at initialization:**
+
+| Issue | Source | PID | Output Seq | Duration | Status |
+|-------|--------|-----|-----------|----------|--------|
+| RSA-67 | RSA-63 | 42681 | 18 | 1h 1m | HUNG |
+| RSA-69 | RSA-31 | 42787 | 1 | 1h 1m | HUNG |
+| RSA-73 | RSA-66 | 44506 | 1 | 1h 6m | HUNG |
+| RSA-68 | RSA-64 | 42683 | 1 | 1h 1m | HUNG |
+
+**Failure Rate:** 4/4 = 100% for Sasi agent today.
+
+**Root Cause:** Blocking in Sasi agent initialization (probable deadlock, resource contention, or environment misconfiguration).
+
+**Recommendation:** 
+1. Quarantine Sasi agent immediately
+2. Investigate initialization blocker
+3. Revert to last stable version or fix root cause before re-enabling
+
+**Incident Reports:** 
+- `fleet-workspace/incident-rsa67-silent-run.md`
+- `fleet-workspace/incident-rsa68-silent-run.md`
+- `fleet-workspace/incident-rsa69-silent-run.md`
+- `fleet-workspace/incident-rsa73-silent-run.md`
+
+---
+
+**Fleet Status:** BLOCKED on Sasi agent escalation. Awaiting engineering team investigation.
