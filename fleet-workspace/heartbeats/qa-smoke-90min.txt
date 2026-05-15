@@ -1,1 +1,2 @@
 2026-05-13T21:08:04Z — 3/3 SKIPPED (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs
+2026-05-15T07:35:00Z — 1/1 SKIPPED (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs — BLOCKER: 1Password CLI not configured
