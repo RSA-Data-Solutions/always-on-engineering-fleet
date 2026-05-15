@@ -42,7 +42,7 @@ Both tools are read-only, require no confirmation, and return structured finding
 
 ## ⚠️ CRITICAL: Sasi Agent Systematic Failure (2026-05-14)
 
-**Four consecutive Sasi agent runs have hung at initialization:**
+**Five consecutive Sasi agent runs have hung at initialization:**
 
 | Issue | Source | PID | Output Seq | Duration | Status |
 |-------|--------|-----|-----------|----------|--------|
@@ -50,8 +50,9 @@ Both tools are read-only, require no confirmation, and return structured finding
 | RSA-69 | RSA-31 | 42787 | 1 | 1h 1m | HUNG |
 | RSA-73 | RSA-66 | 44506 | 1 | 1h 6m | HUNG |
 | RSA-68 | RSA-64 | 42683 | 1 | 1h 1m | HUNG |
+| RSA-44 | RSA-? | ? | 1 | 6h 2m+ | HUNG |
 
-**Failure Rate:** 4/4 = 100% for Sasi agent today.
+**Failure Rate:** 5/5 = 100% for Sasi agent today.
 
 **Root Cause:** Blocking in Sasi agent initialization (probable deadlock, resource contention, or environment misconfiguration).
 
