@@ -2,3 +2,9 @@
 2026-05-15T07:35:00Z — 1/1 SKIPPED (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs — BLOCKER: 1Password CLI not configured2026-05-15T13:00:21Z — RSA-84 qa-smoke-90min: all 3 P0 tests skipped (env_problem: QA_TENANT_SMOKE_PASSWORD not set)
 2026-05-15T16:03:52Z
 2026-05-15T16:09:35Z — 3/3 P0 tests env_problem (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs
+2026-05-15T19:06:49Z — RSA-90 P0 smoke run (3/3 tests env_problem)
+  - all tests skipped: QA_TENANT_SMOKE_PASSWORD not set
+  - blocking: cannot run authenticated P0 suite without credentials
+  - classification: env_problem (not code_bug)
+  - no tickets filed — environmental blocker, not a code issue
+
