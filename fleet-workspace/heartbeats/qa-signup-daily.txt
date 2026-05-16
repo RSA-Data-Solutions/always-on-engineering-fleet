@@ -5,3 +5,4 @@
 2026-05-16T23:39:05Z RSA-85 qa-signup-daily FAILED — P0 email selector bug persists (GH#15)
 2026-05-16T23:46:27Z
 2026-05-17T04:53:00Z RSA-105 qa-signup-daily SKIPPED — QA_BYPASS_SECRET missing (test passed env validation)
+2026-05-16T23:50:55Z run=1696466f status=FAILED step=signup error='[name=email] not found (P0 bug GH#15 persists)'
