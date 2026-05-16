@@ -2,3 +2,4 @@
 2026-05-02T08:07:51Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7(dedup)  step=signup  error=env_problem:ERR_CERT_AUTHORITY_INVALID
 2026-05-15T02:19:24Z
 [2026-05-15T14:55:03Z] RSA-85 qa-signup-daily: FAILED — P0 issue filed (GitHub #15: signup form email selector not found)
+2026-05-16T23:39:05Z RSA-85 qa-signup-daily FAILED — P0 email selector bug persists (GH#15)
