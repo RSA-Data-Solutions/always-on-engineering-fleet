@@ -13,3 +13,4 @@
 2026-05-16T23:34:12Z env_problem — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not injected; run skipped
 2026-05-16T23:35:13Z RSA-88 heartbeat: 3/3 skipped (env_problem) — QA_TENANT_SMOKE_PASSWORD not set, QA_BASE_URL empty. Same blocker as RSA-89, RSA-94, RSA-102. GitHub issue #16 tracks infra fix.
 2026-05-16T23:35:51Z env_problem — 3/3 P0 tests skipped (QA_TENANT_SMOKE_PASSWORD not set). 5th consecutive blocked run. Escalating to blocked status.
+2026-05-16T23:36:29Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
