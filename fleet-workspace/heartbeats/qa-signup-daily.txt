@@ -3,3 +3,5 @@
 2026-05-15T02:19:24Z
 [2026-05-15T14:55:03Z] RSA-85 qa-signup-daily: FAILED — P0 issue filed (GitHub #15: signup form email selector not found)
 2026-05-16T23:39:05Z RSA-85 qa-signup-daily FAILED — P0 email selector bug persists (GH#15)
+2026-05-16T23:46:27Z
+2026-05-17T04:53:00Z RSA-105 qa-signup-daily SKIPPED — QA_BYPASS_SECRET missing (test passed env validation)
