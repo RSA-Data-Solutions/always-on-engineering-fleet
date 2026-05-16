@@ -16,3 +16,4 @@
 2026-05-16T23:36:29Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
 2026-05-16T23:37:10Z env_problem (6th consecutive) — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not set; 3/3 tests skipped
 2026-05-16T23:40:41Z env_problem (QA_TENANT_SMOKE_PASSWORD not set — 3/3 skipped)
+2026-05-16T23:41:25Z env_problem (QA_TENANT_SMOKE_PASSWORD missing, 3/3 skipped)
