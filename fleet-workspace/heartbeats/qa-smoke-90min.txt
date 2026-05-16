@@ -14,3 +14,4 @@
   - blocker owner: user (password manager access required)
   - unblock action: provide QA_TENANT_SMOKE_PASSWORD via environment or secrets management
   - no tests executed, no code_bugs identified, classification: env_problem
+2026-05-16T23:49:32Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
