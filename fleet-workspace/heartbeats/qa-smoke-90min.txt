@@ -15,3 +15,4 @@
 2026-05-16T23:35:51Z env_problem — 3/3 P0 tests skipped (QA_TENANT_SMOKE_PASSWORD not set). 5th consecutive blocked run. Escalating to blocked status.
 2026-05-16T23:36:29Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
 2026-05-16T23:37:10Z env_problem (6th consecutive) — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not set; 3/3 tests skipped
+2026-05-16T23:40:41Z env_problem (QA_TENANT_SMOKE_PASSWORD not set — 3/3 skipped)
