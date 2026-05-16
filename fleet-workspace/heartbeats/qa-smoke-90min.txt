@@ -9,3 +9,4 @@
   - classification: env_problem (not code_bug)
   - no tickets filed — environmental blocker, not a code issue
 2026-05-15T16:36:42Z — RSA-94: 3/3 P0 tests env_problem (Chromium launch timeout). Issue #16 filed (severity/P0, needs-fix). Degradation: 3 consecutive runs blocked.
+2026-05-16T23:32:58Z env_problem — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not injected; run skipped
