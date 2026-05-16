@@ -1,0 +1,39 @@
+# RSA-102: QA Smoke Run — BLOCKED
+
+## Issue
+Cannot execute P0 smoke test suite without QA test infrastructure credentials.
+
+## Requirement
+The test suite (ui_journey/test_p0_suite.py) requires environment variables:
+- QA_TENANT_SMOKE_PASSWORD (required)
+- QA_BASE_URL (optional, defaults to https://inovaide.com)
+
+Conftest.py will skip all authenticated tests if QA_TENANT_SMOKE_PASSWORD is not set.
+
+## Impact
+STEP 2 (Run P0 smoke tests) cannot proceed.
+Steps 1 (discovery) and manual review of automation completed.
+
+## Unblock Action Needed
+DevOps / Infrastructure team must provide test credentials via:
+- Environment variable injection into Paperclip heartbeat, OR
+- Secure secret management in Paperclip, OR
+- Local .env file in /Users/Sashi/Documents/projects/iNova/qa/
+
+## What Was Completed
+✓ STEP 0: Repo paths discovered
+✓ STEP 1: Read fleet manual (SKILL.md, agents/ram.md, lynn.md, sam.md, inova.md)
+✓ Environment: Python venv created, dependencies installed, Playwright configured
+✗ STEP 2: P0 suite blocked on credentials
+- STEP 3: Sam triage (pending)
+- STEP 4: Heartbeat (pending)
+
+## Resume Plan
+Once QA_TENANT_SMOKE_PASSWORD is available:
+1. Set env var in Paperclip context
+2. Retry RSA-102
+3. Execute pytest against inovaide-qa.com
+4. File GitHub issues for failures
+5. Commit heartbeat timestamp
+
+Duration: ~15 minutes (within 20-minute run cap once credentials available)
