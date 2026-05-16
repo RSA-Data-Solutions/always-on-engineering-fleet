@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-05-15T21:03:40Z",
+  "heartbeat": "RSA-101",
+  "repo_path": "/Users/Sashi/Documents/projects/iNova/qa",
+  "test_command": "python -m pytest ui_journey/test_p0_suite.py -v --json-report --json-report-file=/tmp/p0-report.json",
+  "exit_code": 1,
+  "duration_seconds": 991.78,
+  "summary": {
+    "total": 3,
+    "passed": 0,
+    "failed": 0,
+    "error": 3,
+    "skipped": 0
+  },
+  "failing_tests": [
+    {
+      "name": "test_p0_listTables",
+      "failure_type": "env_problem",
+      "error_message": "playwright._impl._errors.TimeoutError: BrowserType.launch: Timeout 180000ms exceeded",
+      "root_cause": "Chromium browser failed to launch within 180s timeout — environmental blocker, not code bug",
+      "raw_output": "ERROR at setup of test_p0_listTables — Chromium launch timeout",
+      "suggested_files": ["conftest.py"],
+      "notes": "Browser initialization failed during fixture setup. All 3 P0 tests hit same failure."
+    },
+    {
+      "name": "test_p0_runSQL",
+      "failure_type": "env_problem",
+      "error_message": "playwright._impl._errors.TimeoutError: BrowserType.launch: Timeout 180000ms exceeded",
+      "root_cause": "Chromium browser failed to launch within 180s timeout — environmental blocker",
+      "raw_output": "ERROR at setup of test_p0_runSQL — Chromium launch timeout",
+      "suggested_files": ["conftest.py"]
+    },
+    {
+      "name": "test_p0_getUserProfile",
+      "failure_type": "env_problem",
+      "error_message": "playwright._impl._errors.TimeoutError: BrowserType.launch: Timeout 180000ms exceeded",
+      "root_cause": "Chromium browser failed to launch within 180s timeout — environmental blocker",
+      "raw_output": "ERROR at setup of test_p0_getUserProfile — Chromium launch timeout",
+      "suggested_files": ["conftest.py"]
+    }
+  ],
+  "environment_issues": [
+    {
+      "type": "browser_launch_timeout",
+      "severity": "blocking",
+      "description": "Playwright Chromium failed to launch within 180-second timeout. Browser process PID=9506 was spawned but never completed initialization.",
+      "root_cause": "System resource constraint, disk I/O slowness, or Chromium binary incompatibility",
+      "unblock_action": "Investigate system performance: (1) check available memory/disk, (2) monitor disk I/O during launch, (3) consider updating Playwright/Chromium, (4) increase Playwright launch timeout"
+    }
+  ],
+  "classification_summary": {
+    "code_bugs": 0,
+    "env_problems": 3,
+    "flaky": 0,
+    "unknown": 0
+  },
+  "tickets_filed": [],
+  "notes": "RSA-101 heartbeat: All 3 P0 tests failed due to Chromium browser launch timeout (env_problem, not code_bug). This is a different blocker than RSA-94 (missing QA_TENANT_SMOKE_PASSWORD) but still environmental. No code fixes recommended. Degradation: all P0 tests blocked by system environment, not test code itself."
+}
