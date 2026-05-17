@@ -16,3 +16,9 @@
   - no tests executed, no code_bugs identified, classification: env_problem
 2026-05-16T23:49:32Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
 2026-05-16T23:52:06Z env_problem (7th consecutive) — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not set; 3/3 tests skipped
+
+2026-05-17T17:15:12Z — RSA-98 qa-smoke-90min: 3/3 P0 tests env_problem (auth timeout at login — 8th consecutive run)
+  - root cause: inovaide.com/login page not rendering email field within 15s
+  - QA_TENANT_SMOKE_PASSWORD now set, QA_BASE_URL=https://inovaide.com now set
+  - Sam triage: confirmed env_problem — auth UI unreachable, not code_bug
+  - no tickets filed, no fixes applied
