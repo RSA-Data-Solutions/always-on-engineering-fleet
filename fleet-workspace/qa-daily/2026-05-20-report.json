@@ -1,0 +1,21 @@
+{
+  "date": "2026-05-20",
+  "timestamp": "2026-05-20T08:04:36Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. Repo lives at /Users/Sashi/Documents/projects/iNova (developer's local machine). git clone https://github.com/RSA-Data-Solutions/iNova failed: 'fatal: could not read Username for https://github.com: No such device or address'. GitHub MCP tools are scoped to rsa-data-solutions/always-on-engineering-fleet only. No GitHub credentials are provisioned in this session.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "env_problem: iNova repo unreachable in cloud session — no GitHub credentials, MCP scope restricted to fleet repo. No tests could run."
+}
