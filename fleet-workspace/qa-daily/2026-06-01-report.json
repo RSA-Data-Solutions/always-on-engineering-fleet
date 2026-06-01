@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-01",
+  "timestamp": "2026-06-01T08:06:30Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone via HTTPS failed (PAT GITHUB_PAT_QA_BOT returned 403 — Write access to repository not granted), and GitHub MCP tools are restricted to rsa-data-solutions/always-on-engineering-fleet only. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 13): env_problem — iNova repo unreachable in cloud session for 13 consecutive days (2026-05-20 through 2026-06-01). GITHUB_PAT_QA_BOT present but returns 403 on clone; GitHub MCP session only permits rsa-data-solutions/always-on-engineering-fleet. ACTION REQUIRED: grant RSA-Data-Solutions/iNova repo:read to GITHUB_PAT_QA_BOT, OR add iNova to allowed GitHub MCP repos, OR provide a separate GITHUB_PAT_INOVA_READ secret with repo:read scope."
+}
