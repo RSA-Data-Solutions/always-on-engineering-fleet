@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-15",
+  "timestamp": "2026-06-15T08:09:33Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone via HTTPS failed (403: Write access to repository not granted). GITHUB_PAT_QA_BOT has repo metadata permissions but lacks contents:read permission. GitHub MCP tools restricted to rsa-data-solutions/always-on-engineering-fleet only. Local git proxy at 127.0.0.1:41485 returned 502 (repository not authorized) — iNova not in session scope. No SSH available. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 27): env_problem — iNova repo unreachable in cloud session for 27 consecutive days (2026-05-20 through 2026-06-15). Root cause: GITHUB_PAT_QA_BOT lacks contents:read permission scope AND iNova is not in this session's GitHub MCP repo scope. ACTION REQUIRED: regenerate GITHUB_PAT_QA_BOT with 'Contents: Read' permission on RSA-Data-Solutions/iNova, OR add iNova to the session's source repos, OR add a read-only deploy key."
+}
