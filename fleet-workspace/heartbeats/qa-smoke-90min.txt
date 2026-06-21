@@ -1,0 +1,24 @@
+2026-05-13T21:08:04Z — 3/3 SKIPPED (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs
+2026-05-15T07:35:00Z — 1/1 SKIPPED (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs — BLOCKER: 1Password CLI not configured2026-05-15T13:00:21Z — RSA-84 qa-smoke-90min: all 3 P0 tests skipped (env_problem: QA_TENANT_SMOKE_PASSWORD not set)
+2026-05-15T16:03:52Z
+2026-05-15T16:09:35Z — 3/3 P0 tests env_problem (QA_TENANT_SMOKE_PASSWORD not set) — 0 failures, 0 code_bugs
+2026-05-15T19:06:49Z — RSA-90 P0 smoke run (3/3 tests env_problem)
+  - all tests skipped: QA_TENANT_SMOKE_PASSWORD not set
+  - blocking: cannot run authenticated P0 suite without credentials
+  - classification: env_problem (not code_bug)
+  - no tickets filed — environmental blocker, not a code issue
+
+2026-05-16T00:30:28Z — RSA-98 qa-smoke-90min: blocked by missing QA_TENANT_SMOKE_PASSWORD
+  - env_problem: credential not available in execution environment
+  - 6 consecutive runs (RSA-85 through RSA-94) blocked on same credential
+  - blocker owner: user (password manager access required)
+  - unblock action: provide QA_TENANT_SMOKE_PASSWORD via environment or secrets management
+  - no tests executed, no code_bugs identified, classification: env_problem
+2026-05-16T23:49:32Z RSA-34 env_problem — QA_TENANT_SMOKE_PASSWORD not set, smoke run skipped
+2026-05-16T23:52:06Z env_problem (7th consecutive) — QA_BASE_URL and QA_TENANT_SMOKE_PASSWORD not set; 3/3 tests skipped
+
+2026-05-17T17:15:12Z — RSA-98 qa-smoke-90min: 3/3 P0 tests env_problem (auth timeout at login — 8th consecutive run)
+  - root cause: inovaide.com/login page not rendering email field within 15s
+  - QA_TENANT_SMOKE_PASSWORD now set, QA_BASE_URL=https://inovaide.com now set
+  - Sam triage: confirmed env_problem — auth UI unreachable, not code_bug
+  - no tickets filed, no fixes applied

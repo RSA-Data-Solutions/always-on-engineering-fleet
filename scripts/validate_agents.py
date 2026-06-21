@@ -11,9 +11,11 @@ import sys
 FLEET_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 REQUIRED_AGENT_FILES = [
-    "agents/cto.md",
-    "agents/qa-engineer.md",
-    "agents/software-engineer.md",
+    # agents/ram.md (CTO) is Paperclip-hosted; its instructions live in Paperclip AGENTS.md.
+    # We still validate it exists as a local file for cross-reference checks.
+    "agents/ram.md",
+    "agents/lynn.md",
+    "agents/sam.md",
     "agents/dhira.md",
 ]
 
@@ -41,18 +43,18 @@ CONTEXT_REQUIRED_STRINGS = [
 ]
 
 AGENT_REQUIRED_SECTIONS = {
-    "agents/cto.md": [
+    "agents/ram.md": [
         "## On start",
         "## The main loop",
         "## Budget awareness",
-        "## Git safety",
+        "## Git safety rules",
     ],
-    "agents/qa-engineer.md": [
+    "agents/lynn.md": [
         "## Inputs",
         "## Your job",
         "## What not to do",
     ],
-    "agents/software-engineer.md": [
+    "agents/sam.md": [
         "## Inputs",
         "## Your job",
         "## What not to do",
@@ -140,13 +142,13 @@ for ctx in ["ibmimcp", "inova", "self-improvement"]:
         f"contexts/{ctx}.md not referenced in CLAUDE.md"
     )
 
-# --- CTO references all agent files ---
-cto_content = read_file("agents/cto.md")
-for agent in ["qa-engineer.md", "software-engineer.md", "dhira.md"]:
+# --- CTO (Ram) references all agent files ---
+cto_content = read_file("agents/ram.md")
+for agent in ["lynn.md", "sam.md", "dhira.md"]:
     check(
         f"cto_references:{agent}",
         agent in cto_content,
-        f"{agent} not referenced in agents/cto.md"
+        f"{agent} not referenced in agents/ram.md"
     )
 
 # --- fleet-workspace/proposals/index.md exists ---

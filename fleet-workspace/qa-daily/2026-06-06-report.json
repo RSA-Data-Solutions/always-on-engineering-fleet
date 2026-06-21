@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-06",
+  "timestamp": "2026-06-06T08:05:00Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone via HTTPS failed (no credentials). GitHub MCP tools restricted to rsa-data-solutions/always-on-engineering-fleet only. No SSH keys available. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 18): env_problem — iNova repo unreachable in cloud session for 18 consecutive days (2026-05-20 through 2026-06-06). Root cause: no read credentials for RSA-Data-Solutions/iNova in this environment. ACTION REQUIRED: add RSA-Data-Solutions/iNova to the session's GitHub MCP repo scope, OR provision a read-only deploy key / INOVA_READ_PAT secret."
+}
