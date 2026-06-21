@@ -1,0 +1,21 @@
+{
+  "date": "2026-05-25",
+  "timestamp": "2026-05-25T08:08:55Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. Repo lives at /Users/Sashi/Documents/projects/iNova (developer local machine). git clone via HTTPS returned 'could not read Username' (no credentials in cloud runner). Local proxy at 127.0.0.1:36121 returned 502 'repository not authorized' — proxy scoped to always-on-engineering-fleet only. GitHub MCP tools also restricted to rsa-data-solutions/always-on-engineering-fleet. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 6): env_problem — iNova repo unreachable in cloud session for 6 consecutive days (2026-05-20 through 2026-05-25). Action required: provision GITHUB_PAT with read scope on RSA-Data-Solutions/iNova, add it as a session secret, and configure a session-start hook to pre-clone the repo to /tmp/inova."
+}

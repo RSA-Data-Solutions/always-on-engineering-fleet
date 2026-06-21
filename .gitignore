@@ -22,15 +22,7 @@ dist/
 # === Python ===
 __pycache__/
 *.pyc
-*.pyo
-.venv/
-venv/
-
-# === OS / Editor ===
-.DS_Store
 .env
-.env.*
-*.swp
-*.swo
-.idea/
-.vscode/
+.DS_Store
+.claude/
+scripts/.DS_Store
