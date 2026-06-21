@@ -10,3 +10,4 @@
 2026-05-20T03:04:51Z FAILED — P0 signup timeout (email input not found at /signup) — GH#15 persists
 2026-05-20T03:04:56Z RSA-908 qa-signup-daily FAILED — P0 email selector timeout (GH#15 dedup) [Playwright timeout 15s waiting for [name="email"] on https://inovaide.com/signup]
 2026-05-20T03:16:34Z RSA-908 qa-signup-daily — selector fix shipped (e2b1d17), blocked on GH#17 (rate limit bypasses bypass). Gmail approach: IP-based limit, dot trick irrelevant.
+2026-06-21T08:00:00Z outcome=FAILED issue=RSA-Data-Solutions/inova#7(dedup) step=signup error=env_problem:ERR_CERT_AUTHORITY_INVALID playwright=1.56.0 chromium=1194 site_reachable=true(HTTP403-bot-protection)
