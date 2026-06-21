@@ -1,7 +1,25 @@
-fleet-workspace/iteration-*/
-fleet-workspace/proposals/
-fleet-workspace/hotfix/
-fleet-workspace/watchdog.log
+# === Credentials / Secrets ===
+# Context files that contain passwords, API keys, or IBM i credentials
+contexts/ibmimcp.md
+contexts/inova.md
+
+# Keep self-improvement context (no secrets)
+!contexts/self-improvement.md
+
+# === Fleet Runtime State ===
+# Workspace is runtime state — regenerated each run, not source of truth
+fleet-workspace/
+# Heartbeats are a persistent audit trail — keep them tracked
+!fleet-workspace/
+!fleet-workspace/heartbeats/
+!fleet-workspace/heartbeats/**
+
+# === Node.js ===
+node_modules/
+dist/
+*.js.map
+
+# === Python ===
 __pycache__/
 *.pyc
 .env

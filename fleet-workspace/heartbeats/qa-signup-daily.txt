@@ -1,12 +1,2 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
-2026-05-02T08:07:51Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7(dedup)  step=signup  error=env_problem:ERR_CERT_AUTHORITY_INVALID
-2026-05-15T02:19:24Z
-[2026-05-15T14:55:03Z] RSA-85 qa-signup-daily: FAILED — P0 issue filed (GitHub #15: signup form email selector not found)
-2026-05-16T23:39:05Z RSA-85 qa-signup-daily FAILED — P0 email selector bug persists (GH#15)
-2026-05-16T23:46:27Z
-2026-05-17T04:53:00Z RSA-105 qa-signup-daily SKIPPED — QA_BYPASS_SECRET missing (test passed env validation)
-2026-05-16T23:50:55Z run=1696466f status=FAILED step=signup error='[name=email] not found (P0 bug GH#15 persists)'
-2026-05-20T03:03:19Z RSA-908 qa-signup-daily FAILED — P0 email selector timeout (GH#15 dedup) [Playwright timeout 15s waiting for [name="email"] on https://inovaide.com/signup]
-2026-05-20T03:04:51Z FAILED — P0 signup timeout (email input not found at /signup) — GH#15 persists
-2026-05-20T03:04:56Z RSA-908 qa-signup-daily FAILED — P0 email selector timeout (GH#15 dedup) [Playwright timeout 15s waiting for [name="email"] on https://inovaide.com/signup]
-2026-05-20T03:16:34Z RSA-908 qa-signup-daily — selector fix shipped (e2b1d17), blocked on GH#17 (rate limit bypasses bypass). Gmail approach: IP-based limit, dot trick irrelevant.
+2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
