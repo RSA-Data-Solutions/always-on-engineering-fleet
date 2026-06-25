@@ -1,0 +1,3 @@
+# qa-fix-on-issue (Routine 5) heartbeat log
+# Format: {iso_timestamp} issue=#{N} pr=#{N} repo={owner/repo}
+# Created 2026-06-25 — seeded by setup run
