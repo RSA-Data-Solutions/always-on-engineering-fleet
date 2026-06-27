@@ -1,2 +1,3 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
 2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
+2026-06-27T01:04:31Z  outcome=FAILED  issues=RSA-Data-Solutions/inova#26,RSA-Data-Solutions/inova#27  step=signup  error=qa_bypass_not_triggered:QA_BYPASS_SECRET_missing_from_prod_orchestrator
