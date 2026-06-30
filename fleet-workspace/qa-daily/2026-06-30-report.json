@@ -1,0 +1,21 @@
+{
+  "date": "2026-06-30",
+  "timestamp": "2026-06-30T08:10:00Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone via HTTPS proxy returns 403 ('The requested URL returned error: 403'). GitHub MCP tools restricted to rsa-data-solutions/always-on-engineering-fleet only — RSA-Data-Solutions/iNova returns 'Access denied'. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 42): env_problem — iNova repo unreachable in cloud session for 42 consecutive days (2026-05-20 through 2026-06-30). Root cause: HTTPS git proxy returns 403 for RSA-Data-Solutions/iNova; GitHub MCP session scope excludes that repo. Fix: add RSA-Data-Solutions/iNova as a session source repo in environment config, OR provide a GITHUB_PAT with Contents read permission for iNova."
+}
