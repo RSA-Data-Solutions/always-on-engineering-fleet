@@ -1,2 +1,3 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
 2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
+2026-07-04T19:52:18Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#32  step=env_setup  error=env_problem:pytest-playwright_0.5.3_unresolvable
