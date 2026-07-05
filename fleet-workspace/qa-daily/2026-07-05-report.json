@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-05",
+  "timestamp": "2026-07-05T08:05:53Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. Both GITHUB_TOKEN and GITHUB_PAT_QA_BOT return 'Repository not found / Authentication failed' for RSA-Data-Solutions/iNova. GitHub MCP session scope is restricted to rsa-data-solutions/always-on-engineering-fleet only. No tests could run.",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 47): env_problem — iNova repo unreachable in cloud session for 47 consecutive days (2026-05-20 through 2026-07-05). Credentials tried: GITHUB_TOKEN (14-char), GITHUB_PAT_QA_BOT. Fix: grant RSA-Data-Solutions/iNova read access to the QA bot PAT, OR add RSA-Data-Solutions/iNova as a session source repo in environment config."
+}
