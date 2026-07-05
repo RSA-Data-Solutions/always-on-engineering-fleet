@@ -1,1 +1,2 @@
 2026-06-28T02:04:40Z freed=0 status=failed reason=ssh_not_available_in_remote_env
+2026-07-05T02:03:34Z freed=0 status=error reason=ssh_key_missing_in_remote_env
