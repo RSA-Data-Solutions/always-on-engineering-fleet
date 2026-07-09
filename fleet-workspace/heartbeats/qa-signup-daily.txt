@@ -1,3 +1,4 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
 2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
 2026-07-04T22:16:02Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#33  step=signup  error=env_problem:mitm_relay_missing_ignore_https_errors  also_open=RSA-Data-Solutions/inova#32(env_problem:bad_requirements_pin)
+2026-07-09T06:05:02Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#37  step=env_setup  error=env_problem:playwright_unbounded_pin_browser_revision_drift  also_open=RSA-Data-Solutions/inova#30(env_problem:qa_bypass_secret_not_persisting,P0,day10+)
