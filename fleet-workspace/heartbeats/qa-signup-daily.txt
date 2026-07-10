@@ -1,3 +1,4 @@
 2026-04-29T00:48:22Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist
 2026-04-30T08:34:55Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#7  step=signup  error=env_problem:runner_browser_network_allowlist  recurrence=day2
 2026-07-04T22:16:02Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#33  step=signup  error=env_problem:mitm_relay_missing_ignore_https_errors  also_open=RSA-Data-Solutions/inova#32(env_problem:bad_requirements_pin)
+2026-07-10T21:06:21Z  outcome=FAILED  issue=RSA-Data-Solutions/inova#30  step=signup  error=platform_bug:qa_bypass_not_honored  recurrence=day15+(23+occurrences)  also_tracked=RSA-Data-Solutions/inova#37(env_problem:chromium_revision_drift,worked_around_locally)  note=cron_firing_every~3h_not_daily_this_is_7th_run_today_see_issue30  escalation=none_this_run(already_paged_0607utc_slack_send_timed_out_again)
