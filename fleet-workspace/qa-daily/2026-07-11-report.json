@@ -13,7 +13,7 @@
     {
       "test": "ALL",
       "failure_type": "env_problem",
-      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone https://github.com/RSA-Data-Solutions/iNova fails with exit code 128 (terminal prompts disabled — private repo, no credentials). GITHUB_PAT_QA_BOT denied with 403 (Write access not granted). GitHub MCP session scope is restricted to rsa-data-solutions/always-on-engineering-fleet only. No tests could run.",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone https://github.com/RSA-Data-Solutions/iNova fails with 403 (GITHUB_PAT_QA_BOT lacks repo access). The git proxy injected in ~/.gitconfig points to port 41729 which is no longer running (live proxy is at 43859). GitHub MCP session scope restricted to rsa-data-solutions/always-on-engineering-fleet only. No tests could run.",
       "suggested_files": ["contexts/inova.md"]
     }
   ],
