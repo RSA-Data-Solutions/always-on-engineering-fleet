@@ -2,3 +2,4 @@ qa-signup-daily heartbeat log
 File created by Routine 2 — daily fresh-signup regression
 ============================================================
 2026-07-11T14:55:29Z — FAILED — signup QA bypass not working on PROD — issue #38 filed
+2026-07-12T21:04:04Z — FAILED (pre-flight) — QA_BYPASS_SECRET still mismatched on live orchestrator — reoccurrence logged on issue #30 (day 13+); #38 closed prematurely without secret sync — no account created (probe blocked pre-signup)
