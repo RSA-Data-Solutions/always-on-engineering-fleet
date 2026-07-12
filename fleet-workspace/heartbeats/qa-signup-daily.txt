@@ -2,3 +2,10 @@ qa-signup-daily heartbeat log
 File created by Routine 2 — daily fresh-signup regression
 ============================================================
 2026-07-11T14:55:29Z — FAILED — signup QA bypass not working on PROD — issue #38 filed
+2026-07-12T03:04:15Z — BLOCKED (no run) — test_signup.py could not execute: pytest-playwright
+  resolved playwright==1.61.0 (expects Chromium revision 1228) but this session's sandbox
+  only has Chromium revision 1194 pre-baked at /opt/pw-browsers. Environment/tooling
+  mismatch in the execution sandbox, not a signal about inovaide.com itself — no request
+  ever reached the live site, no account was created, no GitHub issue filed. Needs a human
+  to pin qa/requirements.txt's playwright version to match the sandbox's baked browser
+  revision (or rebake the sandbox image) before this routine can run again.
