@@ -2,4 +2,4 @@ qa-signup-daily heartbeat log
 File created by Routine 2 — daily fresh-signup regression
 ============================================================
 2026-07-11T14:55:29Z — FAILED — signup QA bypass not working on PROD — issue #38 filed
-2026-07-12T06:05:00Z — FAILED — signup QA bypass still not working on PROD (day 2, dedup ec54cd73fc12) — reoccurrence noted on issue #38, needs-human-review
+2026-07-12T06:05:00Z — FAILED — signup QA bypass still not working on PROD (day 13+, root cause unchanged since 2026-06-30) — reoccurrence noted on canonical issue #30; flagged #38 as a duplicate of #30
