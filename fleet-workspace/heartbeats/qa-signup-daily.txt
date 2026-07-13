@@ -2,3 +2,4 @@ qa-signup-daily heartbeat log
 File created by Routine 2 — daily fresh-signup regression
 ============================================================
 2026-07-11T14:55:29Z — FAILED — signup QA bypass not working on PROD — issue #38 filed
+2026-07-13T18:08:00Z status=blocked_by_known_p0 issue=#30 repo=RSA-Data-Solutions/inova passed=0/1 duration=5.5s reason=QA_BYPASS_SECRET_mismatch_unresolved_14days note=routine_fired_5x_today_investigate_cron
