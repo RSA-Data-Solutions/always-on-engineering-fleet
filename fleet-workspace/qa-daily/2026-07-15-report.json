@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-15",
+  "timestamp": "2026-07-15T08:05:11Z",
+  "routine": "qa-smoke-daily",
+  "total": 18,
+  "passed": 0,
+  "failed": 0,
+  "skipped": 18,
+  "pass_rate": 0.0,
+  "duration_seconds": 0,
+  "status": "env_problem",
+  "failures": [
+    {
+      "test": "ALL",
+      "failure_type": "env_problem",
+      "error_message": "iNova repository is not accessible in this cloud execution environment. git clone https://github.com/RSA-Data-Solutions/iNova fails — proxy credential scope is restricted to rsa-data-solutions/always-on-engineering-fleet only. Error: fatal: could not read Password for 'http://local_proxy@127.0.0.1:41729': terminal prompts disabled",
+      "suggested_files": ["contexts/inova.md"]
+    }
+  ],
+  "notes": "RECURRING (day 57): env_problem — iNova repo unreachable in cloud session for 57 consecutive days (2026-05-20 through 2026-07-15). Fix: add RSA-Data-Solutions/iNova as a source repo in code.claude.com environment settings, or grant RSA-Data-Solutions/iNova read access to the session credential."
+}
