@@ -74,3 +74,15 @@ Automated failures file issues in Paperclip with labels:
 - `needs-fix` — Sam can pick up
 
 CTO reviews daily report and approves/defers fixes.
+
+---
+
+## Known environment blocker
+
+`qa-smoke-daily` has been blocked (`env_problem`, 0/18 tests) since 2026-05-20 because the
+always-on cloud session cannot reach the `RSA-Data-Solutions/iNova` repo. See
+[Issue #11](https://github.com/RSA-Data-Solutions/always-on-engineering-fleet/issues/11) and
+the decision record at `fleet-workspace/issue11-inova-access-decision.md` for root cause and
+the required unblock action (environment config change by a human operator — not fixable in
+this repo). Do not file duplicate incidents for this same root cause; append a heartbeat line
+and reference Issue #11 instead.

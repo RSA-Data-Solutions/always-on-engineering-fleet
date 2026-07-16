@@ -92,6 +92,29 @@ A test passes when: pytest exit code 0, no uncaught exceptions in smoke tests.
 
 ---
 
+## Known environment blocker — iNova repo unreachable from always-on cloud session
+
+**Status:** BLOCKED — requires human action outside this repo (as of 2026-07-04, unresolved
+for 46+ consecutive `qa-smoke-daily` runs). See
+[Issue #11](https://github.com/RSA-Data-Solutions/always-on-engineering-fleet/issues/11) and
+the decision record at `fleet-workspace/issue11-inova-access-decision.md`.
+
+The ephemeral cloud session that runs `qa-smoke-daily` cannot reach
+`RSA-Data-Solutions/iNova`:
+- HTTPS clone fails — no GitHub credentials available in the container.
+- GitHub MCP tools are scoped to `rsa-data-solutions/always-on-engineering-fleet` only;
+  calls against `RSA-Data-Solutions/iNova` return `403 Access Denied`.
+
+**This cannot be fixed by editing files in this repository.** The unblock action is one of:
+- **Option A:** Add `RSA-Data-Solutions/iNova` as a source repo in the always-on
+  environment config (Claude Code on the web → Settings → Sources).
+- **Option B:** Provide a `GITHUB_PAT` env var with `Contents: read` permission for
+  `RSA-Data-Solutions/iNova` in the environment config.
+
+Until one of these is applied by a human operator, `qa-smoke-daily` should record a single
+heartbeat line noting `env_problem` and reference Issue #11 — do **not** re-diagnose or file
+duplicate incident issues for the same root cause.
+
 ## Known quirks and constraints
 
 - Docker services must be running for integration tests; start with `docker compose up -d`
