@@ -131,30 +131,90 @@ Do not operate five concurrent local coding agents. Run a single active Hermes t
 fleet_limits:
   paperclip_planners: 1
   hermes_active_tasks: 1
-  hermes_parallel_tool_calls: 2
+  hermes_parallel_tool_calls: 2   # sequential/pipelined tool calls within one model turn — NOT concurrent generations
   local_llm_concurrent_requests: 1
   coding_task_timeout_minutes: 45
   test_task_timeout_minutes: 30
   queued_tasks_per_repository: 1
 ```
 
+`hermes_parallel_tool_calls` must never be read as "set `--parallel 2` on llama-server." llama.cpp's server divides the total `-c` context budget across `--parallel` slots, so raising `--parallel` would silently cut the configured 98K context per request. Keep `--parallel 1` always — it also matches the "one active Hermes task" rule.
+
 ### Initial model strategy
 
-| Work type | Recommended model profile | Operating guidance |
+Both Paperclip and Hermes call the **same** llama.cpp endpoint and the **same** loaded model. A separate small planner model alongside a large coder model was considered and rejected for this hardware: with one GPU and a single concurrent-request limit already in place, a second model either double-books VRAM that the large context needs, or requires hot-swapping models per request (10–60s load stalls that erase any latency benefit of a "fast" planner). Paperclip's planning calls are naturally short-context, so they run cheaply on the shared model without a dedicated tier.
+
+This host already has a deployed model, confirmed live at time of writing: **Qwen3-Coder-30B-A3B-Instruct**, unsloth `UD-Q4_K_XL` GGUF quant, served via `llama-qwen.service`. This is a good fit for the shared-model strategy:
+
+```text
+Model:            Qwen3-Coder-30B-A3B-Instruct (unsloth UD-Q4_K_XL, ftype "Q4_K - Medium")
+Architecture:     qwen3moe (Mixture-of-Experts)
+Total params:     30.53B  (128 experts, 8 active per token, ~3B active — the "A3B")
+Weight file size: 17,659,361,280 bytes (~16.45 GiB)
+Layers:           48
+Attention heads:  32 (query), 4 (key/value — GQA 8:1)
+Head dim:         128
+Native n_ctx_train: 262,144  (98K deployed is well inside the model's trained range)
+```
+
+| Work type | Model / endpoint | Context policy |
 |---|---|---|
-| Paperclip planning/routing | Small instruct model, approximately 7B–14B quantized | Short contexts; conservative planning and summarization |
-| Hermes issue/CI triage | 7B–14B coding or instruct model, Q4/Q5 | One request at a time |
-| Hermes code changes | 14B–24B coding model, Q4 | One active task; begin with 16K context |
-| Large/refactor tasks | Queue, reduce context, or use a deliberately chosen stronger model endpoint | Do not parallelize local coding agents |
+| Paperclip planning/routing | Shared llama.cpp model (Qwen3-Coder-30B-A3B) | Short prompts in practice; no special handling needed |
+| Hermes issue/CI triage | Shared llama.cpp model | Normal working budget (~16K–32K); one request at a time |
+| Hermes code changes | Shared llama.cpp model | Normal working budget (~16K–32K) by default |
+| Large/refactor tasks | Shared llama.cpp model | Explicitly allowed to grow toward the full 98K ceiling for this one queued task only |
 | RAG/embeddings | Small dedicated embedding model or off-hours scheduled task | Do not compete with active coding inference |
+
+98K is the available ceiling on this host, not the default working size, for two reasons:
+
+1. **VRAM fit is real but tight** — see "llama.cpp capacity for 98K context" below.
+2. **Quality degrades before the context limit does.** Even MoE coding models typically show retrieval/reasoning degradation well before 90K+ tokens, independent of whether the tokens physically fit. Keeping normal tasks in a smaller working budget is a deliberate quality/latency choice, not a hardware limitation being worked around.
+
+### llama.cpp capacity for 98K context — measured against the actual deployed model
+
+KV cache size per token is:
+
+```text
+bytes/token = 2 (K+V) x n_layers x n_kv_heads x head_dim x bytes_per_element
+```
+
+For the real deployed model (48 layers, 4 KV heads — not 32; GQA collapses attention heads 8:1 — head_dim 128):
+
+```text
+2 x 48 x 4 x 128 = 49,152 elements/token
+f16  KV (2.0 B/elem): ~96 KB/token  -> 98,304 tokens ~= 9.0 GB
+q8_0 KV (~1.0 B/elem): ~48 KB/token -> 98,304 tokens ~= 4.6 GB   <- this host's actual configured setting
+q4_0 KV (~0.5 B/elem): ~24 KB/token -> 98,304 tokens ~= 2.3 GB
+```
+
+Total VRAM budget at the deployed settings (`-ctk q8_0 -ctv q8_0 -fa on`, `-c 98304`, `--parallel 1`):
+
+```text
+Model weights (Q4_K_XL):        ~17.7 GB
+KV cache (q8_0, 98,304 ctx):     ~4.6 GB
+Compute/ubatch buffers (-ub 1024, graph overhead): roughly 1-2 GB
+---------------------------------------------------------------
+Estimated total:                ~23.5-24.3 GB   on a 24 GB card
+```
+
+**This is why the MoE architecture matters:** KV cache cost is driven entirely by attention dimensions (layers x KV heads x head_dim), not by total parameter count. A 30B-parameter MoE model with only 4 KV heads has a smaller KV footprint than a much smaller *dense* model with more KV heads — the earlier generic "14B dense model" estimate in this document materially overstated the KV cost for this specific model. That is what makes a 98K ceiling viable here at all despite the model's large nominal size.
+
+The estimate above lands right at the 24 GB ceiling with little headroom — treat it as tight, not comfortable. Practical implications:
+
+- There is essentially no VRAM margin for a second concurrent load of this model, a second model, or a larger `--parallel` value at this context size.
+- If host measurement shows instability (OOM, driver eviction, thrashing) at sustained 90K+ token requests, drop to `q4_0` KV cache (frees ~2.3 GB) or reduce the ctx ceiling (e.g. 64K) before touching quantization of the weights themselves.
+- Re-run this calculation if the model file changes — do not assume it transfers.
+
+**Note on the two `llama-server` processes visible in `ps aux` (checked 2026-09-12):** at first glance this looked like two independent instances double-loading the same model — `PID 2303376` (`llama-qwen.service`, `0.0.0.0:8080`, the `--models-dir`/`--models-max 1` router, API-key protected) and `PID 157316` (`127.0.0.1:46567`, a direct `-m` load, no API key). Checking the process tree showed `157316`'s parent is `2303376`, and `tools/server/server-models.cpp` in this llama.cpp checkout is the router's model-worker implementation — so `:46567` is not a second, independent instance. It is the router's own child worker process that actually holds the model and serves inference, reached only by the router proxying to it internally. There is one model resident in VRAM, matching the capacity estimate above, not two. Do not stop the `:46567` process directly — it is the running model backing the production `:8080` endpoint, and killing it just forces the router to reload (or errors requests) rather than freeing anything meaningful.
 
 ### Memory pressure rules
 
-1. Start llama.cpp with maxmil context and optimal evel.
-2. Use one active generation/request.
-3. Measure host RAM, GPU VRAM, swap, latency, and OOM events during long Hermes tasks.
-4. If unstable, reduce context before changing model quantization or adding concurrency.
+1. Configure llama.cpp for the full 98K context ceiling using flash attention (`-fa`) and a quantized KV cache (`--cache-type-k q8_0 --cache-type-v q8_0`, or `q4_0` if VRAM is still tight) so the ceiling actually fits in 24 GB alongside model weights — see the capacity math above.
+2. Use one active generation/request (`--parallel 1`).
+3. Measure host RAM, GPU VRAM, swap, latency, and OOM events under a real request near the 90K+ token range, not just at idle.
+4. If unstable, drop the configured context ceiling (e.g. to 64K or 32K) before changing model quantization or adding concurrency.
 5. Do not allow test/build containers to run concurrently with a large local inference job unless measurement shows headroom.
+6. Structure Hermes task conversations as append-only — never rewrite or reorder earlier turns. llama.cpp's server caches the processed prefix per slot; with `--parallel 1` there is exactly one slot, so an append-only conversation reuses that cache and each new turn only pays prefill cost for new tokens. A framework that reconstructs the prompt from scratch every turn would reprocess up to 90K+ tokens of prefill per tool call — tens of seconds of dead time on this hardware, risking the 45-minute task timeout on any nontrivial task.
 
 ## Host preparation
 
@@ -171,8 +231,7 @@ sudo install -d -o paperclip -g paperclip /srv/paperclip/data
 sudo install -d -o paperclip -g paperclip /srv/paperclip/postgres
 sudo install -d -o hermes -g hermes /srv/hermes/config
 sudo install -d -o hermes -g hermes /srv/hermes/workspaces
-sudo install -d -o hermes -g hermes /srv/he
-rmes/audit
+sudo install -d -o hermes -g hermes /srv/hermes/audit
 sudo install -d -o llama -g llama /srv/llama/models
 sudo install -d -o llama -g llama /srv/llama/cache
 ```
@@ -189,51 +248,68 @@ sudo install -d -o llama -g llama /srv/llama/cache
 
 ## llama.cpp deployment
 
-Run a single llama.cpp server process, bound to loopback unless a separate internal worker requires network access.
-
-Illustrative systemd unit: IF WE ALREADY HAVE BETTER SETUP, LEAVE IT AS IT IS
+This host already runs llama.cpp as a systemd service — do not stand up a competing deployment. The actual unit in place (`/etc/systemd/system/llama-qwen.service`, backend: Vulkan build at `build-vulkan/bin/llama-server`, confirming Vulkan — not SYCL/oneAPI — is the backend in production use on this Arc B60):
 
 ```ini
-# /etc/systemd/system/llama-server.service
+# /etc/systemd/system/llama-qwen.service
 [Unit]
-Description=llama.cpp local inference server
-After=network-online.target
+Description=llama.cpp Vulkan server — Qwen3 Coder on Intel Arc B60
 Wants=network-online.target
+After=network-online.target
 
 [Service]
-User=llama
-Group=llama
-WorkingDirectory=/srv/llama
-ExecStart=/usr/local/bin/llama-server \
-  -m /srv/llama/models/your-coding-model.gguf \
-  --host 127.0.0.1 \
-  --port 8080 \
-  -c 16384 \
+Type=simple
+User=sashi
+Group=sashi
+SupplementaryGroups=render video
+WorkingDirectory=/home/sashi/Documents/ai/llama.cpp
+EnvironmentFile=/etc/default/llama-qwen
+
+Environment=HOME=/home/sashi
+Environment=GGML_VK_VISIBLE_DEVICES=0
+Environment=VK_LOADER_DEBUG=error
+
+ExecStart=/home/sashi/Documents/ai/llama.cpp/build-vulkan/bin/llama-server \
+  --models-dir /home/sashi/Documents/ai/models/llamacpp \
+  --models-max 1 \
   -ngl 999 \
-  --parallel 1
-Restart=always
-RestartSec=5
-TimeoutStopSec=30
+  --parallel 1 \
+  -c 98304 \
+  -ctk q8_0 \
+  -ctv q8_0 \
+  -ub 1024 \
+  --cache-reuse 256 \
+  -fa on \
+  --host 0.0.0.0 \
+  --port 8080
+
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=90
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+The live unit currently has the API key inlined directly as a `--api-key` argument in `ExecStart`, which is why it showed up in plain text in `ps aux` output (readable by any local user via `/proc/PID/cmdline`, and easy to leak into logs/screenshots). Referencing it as `--api-key ${LLAMA_API_KEY}` would **not** fix this — systemd resolves `${VAR}` substitutions in `ExecStart=` before calling `execve()`, so the resolved plaintext key still ends up in the process's argv and is still visible in `ps aux`. The actual fix, applied above: drop `--api-key` from `ExecStart` entirely and set `LLAMA_API_KEY` via `EnvironmentFile=` instead — `llama-server`'s argument parser (`common/arg.cpp`, the `--api-key` option is registered with `set_env("LLAMA_API_KEY")`) reads it directly from the process environment when the flag is absent, so the key never appears in argv/cmdline at all. Keep the environment file at mode 600, owned by the service's user (`sashi`), and do not commit it or its value anywhere, per the repo's own "never put secrets in Git" rule.
+
+This deployment already implements the recommendations from the capacity analysis above: `-fa on` plus `-ctk/-ctv q8_0` quantized KV cache, `--parallel 1`, and `-c 98304`. `--models-dir`/`--models-max 1` is llama.cpp's built-in single-model router — it can serve multiple GGUFs from that directory (there is also a `dolphin-llama31-8b-q4-k-m.gguf` symlinked alongside the Qwen model) but never loads more than one at a time, which is the correct behavior for a 24 GB card that's already near saturation with one model resident.
+
 Notes for Claude:
 
-- Verify the actual GPU backend/build flags supported by the installed llama.cpp binary for Arc B60. Do not assume `-ngl` or backend behavior is identical across Vulkan, SYCL, oneAPI, and other builds.
-- Use a known-good model file path and confirm model-load output includes expected accelerator offload.
-- Begin at 16K context and `--parallel 1`.
-- Restrict the endpoint to `127.0.0.1:8080` and local network 192.168.68.0/24, CloudFlared tunnel manully will be swr.
-- Do not expose the model endpoint public and harness the securoty for the public use.
+- Flash attention and quantized KV cache are confirmed working on this Vulkan build (the live server reports `n_ctx: 98304` via `/props` and is healthy) — the earlier generic caveat about verifying backend support is resolved for this host. Still re-verify after any llama.cpp binary upgrade, since Vulkan op coverage has changed across releases.
+- The process visible on `127.0.0.1:46567` is the router's own model-worker child (see note above) — expected, not a second instance to clean up. Point Hermes/Paperclip only at `:8080`; never at the internal worker port directly, since the router may recycle or renumber that worker process.
+- Bind the production endpoint per the existing unit: `0.0.0.0:8080` protected by the API key, reachable on the LAN (`192.168.68.0/24`). Any access beyond the LAN must go through a separately, manually configured tunnel (e.g. Cloudflare Tunnel) sitting in front of the API key, not instead of it — never rely on the API key alone once the endpoint is reachable from outside the LAN.
+- Point Hermes's `base_url` at `http://127.0.0.1:8080/v1` (or the LAN IP) and supply the API key as a bearer token from Hermes's own secret store, not hardcoded in `hermes.yaml`.
 
 Validation:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now llama-server
-curl --fail http://127.0.0.1:8080/health
-curl --fail http://127.0.0.1:8080/v1/models
+sudo systemctl enable --now llama-qwen
+curl --fail -H "Authorization: Bearer $LLAMA_API_KEY" http://127.0.0.1:8080/health
+curl --fail -H "Authorization: Bearer $LLAMA_API_KEY" http://127.0.0.1:8080/v1/models
 ```
 
 ## Paperclip deployment
@@ -319,10 +395,12 @@ runtime:
 models:
   default:
     provider: openai_compatible
-    base_url: http://127.0.0.1:8080/v1
-    model: local-coder
+    base_url: http://127.0.0.1:8080/v1        # the existing llama-qwen.service router
+    model: qwen3-coder-30b-a3b-q4-k-xl          # matches the alias reported by /v1/models
+    api_key_env: LLAMA_API_KEY                  # read from Hermes's own secret store, never hardcoded here
     max_concurrent_requests: 1
-    context_budget_tokens: 12000
+    context_budget_tokens: 24000       # normal working budget for triage/coding tasks
+    context_ceiling_tokens: 98304      # hard ceiling; matches this host's deployed -c 98304 — only large/refactor task class may approach this
 
 github:
   auth_mode: github_app
@@ -915,7 +993,9 @@ Do not persist raw secrets, private keys, GitHub tokens, or full sensitive promp
 ### Platform validation
 
 - [ ] Confirm OS, kernel, llama.cpp build, Arc GPU backend, and model inference stability.
-- [ ] Measure RAM/VRAM/swap under one long local inference request.
+- [ ] Measure RAM/VRAM/swap under one long local inference request near the 90K+ token range, not just at idle — the capacity math in "llama.cpp deployment" puts the deployed model within ~1 GB of the 24 GB ceiling.
+- [ ] Confirm exactly one model is resident in GPU VRAM (the `:46567` process is the router's own worker child, not a separate load — see the note in "llama.cpp deployment"; do not stop it).
+- [x] Confirm the API key no longer appears in `ps aux`/`/proc/PID/cmdline` for the llama-qwen process — it must come from `EnvironmentFile=`/`LLAMA_API_KEY`, not a `--api-key` argument (see "llama.cpp deployment"). **Done 2026-09-12**: verified `--api-key` is absent from the running process's argv, `/etc/default/llama-qwen` is mode 600 owned by `sashi`, and auth is still enforced (401 without the key, 200 with it on `/v1/models`).
 - [ ] Confirm GitHub App can read the pilot repository but cannot modify source during Phase 1.
 - [ ] Confirm Paperclip persistence across restart.
 - [ ] Confirm database backup and test restore.
