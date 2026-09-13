@@ -10,7 +10,7 @@ This context file tells the engineering fleet about the IBMiMCP project.
 |-------|-------|
 | Name | IBMiMCP |
 | Description | MCP server with 130+ tools for IBM i (AS/400) access via SSH/JDBC |
-| Repo path | `/Users/Sashi/Documents/projects/IBMiMCP` |
+| Repo path | `/home/sashi/Documents/projects/RSA/IBMiMCP` |
 | Language | TypeScript / Node.js |
 | Test runner | Python (`python3 run_tests.py`) |
 
@@ -39,7 +39,7 @@ ADMIN_API_KEY=REDACTED_ADMIN_API_KEY
 
 Start the server before running tests:
 ```bash
-cd /Users/Sashi/Documents/projects/IBMiMCP
+cd /home/sashi/Documents/projects/RSA/IBMiMCP
 PORT=3051 ADMIN_API_KEY=REDACTED_ADMIN_API_KEY \
   node dist/index.js --http --port 3051 &
 sleep 3

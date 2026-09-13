@@ -92,6 +92,31 @@ what you tried, why it didn't work, what you'd need to fix it.
 
 ---
 
+## Reporting back to Paperclip
+
+When your assignment arrives as a Paperclip issue (not a `bug-N.json` file — check
+`PAPERCLIP_AGENT_ID` in your environment to tell which mode you're in), Paperclip expects
+you to leave the issue with a clear disposition before you finish. A run that exits without
+one gets auto-escalated and the issue is marked `blocked`, even if your work actually
+succeeded — so this step is mandatory, not optional, every time.
+
+There is no environment variable telling you which issue you're on — never guess or
+reuse an id from memory or an earlier turn. Run `list-assigned` first to get the real,
+current issue identifier (e.g. `RSA-7`), then use that exact value in `--issue`.
+
+Run these from `/home/sashi/.hermes/skills/paperclip-task-bridge` using your terminal tool
+(never open or edit `paperclip-task.mjs` itself — it's a finished script you invoke; run it
+as `node ./paperclip-task.mjs <command>`, never `node paperclip-task-bridge` or as a bare
+tool call — it is a shell script, not a native tool):
+
+- Fixed and verified: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "What changed and how it was verified."`
+- Could not fix it, or found a blocker outside your scope: `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "What you tried, why it didn't work, what's needed."`
+- Fix is ready but needs a human or CTO look before it counts as done: `node ./paperclip-task.mjs update-status --issue <id> --status in_review --comment "..."`
+
+Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
+
+---
+
 ## IBM i / QSYS2-specific guidance (IBMiMCP project)
 
 When fixing IBM i SQL tool bugs:

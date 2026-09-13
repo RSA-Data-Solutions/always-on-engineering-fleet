@@ -17,7 +17,7 @@ The CTO passes you a deployment order file (`deploy-N.json`):
 
 ```json
 {
-  "repo_path": "/Users/Sashi/Documents/projects/IBMiMCP",
+  "repo_path": "/home/sashi/Documents/projects/RSA/IBMiMCP",
   "build_command": "npm run build",
   "start_command": "node dist/server.js",
   "environment": {
@@ -34,11 +34,22 @@ The CTO passes you a deployment order file (`deploy-N.json`):
 }
 ```
 
-**CRITICAL — File system access:** The project repo is on the user's Mac. Use
-`mcp__Desktop_Commander__start_process` (always with a `timeout_ms`) for all shell
-commands. Use `mcp__Desktop_Commander__read_file` to inspect files on the Mac.
-The fleet workspace (`fleet-workspace/`) is in the Linux sandbox — use the normal
-`Write` tool there.
+**File system access:** As of the Paperclip + Hermes migration, `repo_path` for every
+current project (IBMiMCP, iNova, and the fleet repo itself) lives on the same host as
+the fleet — a plain Ubuntu/Linux machine. When `repo_path` is local like this, use the
+normal shell/file tools (`Bash`, `Read`, `Write`, `Edit`) directly. Every shell command
+in this file (`pkill`, `curl`, `npm`, `docker compose`) is POSIX and runs unchanged on
+macOS, Linux, or WSL — none of it is OS-specific.
+
+If a future project's context file points `repo_path` at a *different* machine than the
+one Hermes is running on (e.g. a Mac while Hermes runs on Linux, or a Windows box reached
+only outside WSL), that context file will say so and name the remote-execution tool to
+use for that project. Don't assume a specific tool (Desktop Commander or otherwise) or a
+specific OS (Mac or otherwise) by default — the project's own context file is the source
+of truth for where its repo lives and how to reach it. Absent such a note, assume local.
+
+The fleet workspace (`fleet-workspace/`) always lives in the fleet's own repo — use the
+normal `Write`/`Read` tools there regardless of where the target project's repo lives.
 
 ---
 
@@ -175,6 +186,30 @@ server. Do NOT stop the server — leave it running for QA.
 **If `overall_status` is `FAILED`:** The CTO will not spawn QA. Include in `notes` exactly
 what failed and what the CTO should try next (e.g., check build errors, check port
 conflict).
+
+---
+
+## Reporting back to Paperclip
+
+When your assignment arrives as a Paperclip issue (not a CTO-passed deployment order —
+check `PAPERCLIP_AGENT_ID` in your environment to tell which mode you're in), Paperclip
+expects a clear disposition on the issue before you finish. A run that exits without one
+gets auto-escalated and the issue is marked `blocked` regardless of what actually happened
+— so this step is mandatory, every time.
+
+There is no environment variable telling you which issue you're on — never guess or
+reuse an id from memory or an earlier turn. Run `list-assigned` first to get the real,
+current issue identifier (e.g. `RSA-7`), then use that exact value in `--issue`.
+
+Run these from `/home/sashi/.hermes/skills/paperclip-task-bridge` using your terminal tool
+(never open or edit `paperclip-task.mjs` itself — it's a finished script you invoke; run it
+as `node ./paperclip-task.mjs <command>`, never `node paperclip-task-bridge` or as a bare
+tool call — it is a shell script, not a native tool):
+
+- `overall_status: READY`: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "Deployed. <health check + smoke test summary>"`
+- `overall_status: FAILED`: `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "<what failed, what to try next>"`
+
+Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
 ---
 

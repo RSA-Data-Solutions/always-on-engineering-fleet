@@ -85,6 +85,31 @@ Write `qa-report.json` to `output_path`:
 
 ---
 
+## Reporting back to Paperclip
+
+When your assignment arrives as a Paperclip issue (not a CTO-passed job — check
+`PAPERCLIP_AGENT_ID` in your environment to tell which mode you're in), Paperclip expects
+a clear disposition on the issue before you finish. A run that exits without one gets
+auto-escalated and the issue is marked `blocked` regardless of what your tests actually
+showed — so this step is mandatory, every time.
+
+There is no environment variable telling you which issue you're on — never guess or
+reuse an id from memory or an earlier turn. Run `list-assigned` first to get the real,
+current issue identifier (e.g. `RSA-7`), then use that exact value in `--issue`.
+
+Run these from `/home/sashi/.hermes/skills/paperclip-task-bridge` using your terminal tool
+(never open or edit `paperclip-task.mjs` itself — it's a finished script you invoke; run it
+as `node ./paperclip-task.mjs <command>`, never `node paperclip-task-bridge` or as a bare
+tool call — it is a shell script, not a native tool):
+
+- All tests passed: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "X/X tests passed. <one-line summary>"`
+- One or more tests failed: `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "<summary of failures, classified as code_bug/env_problem/flaky/unknown>"` — this is correct even though you did your job fully; a red suite is real information for the CTO, not a QA failure.
+- Could not run the suite at all (env problem before any test ran): `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "..."`
+
+Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
+
+---
+
 ## Project-specific notes
 
 ### IBMiMCP (contexts/ibmimcp.md)
