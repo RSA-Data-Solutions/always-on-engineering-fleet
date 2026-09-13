@@ -1,5 +1,7 @@
 # Routine 2 — Sam Auto-Fix on Issue Open (`qa-fix-on-issue-open`)
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 Hermes-native cron job. Polls for open issues labeled `needs-fix` + `qa-bot` + `severity/P0` or `severity/P1`
 in iNova and IBMiMCP repos, then attempts an autonomous fix.
 

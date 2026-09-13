@@ -1,5 +1,7 @@
 # Maximum-Bug-Finding Routines
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 Reorganized routine plan for the goal: find as many bugs as possible
 within the 15/day cap, with autonomous fixes via Sam-bot.
 

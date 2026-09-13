@@ -1,5 +1,7 @@
 # Routine 1 — Daily Signup Regression (`qa-signup-daily`)
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 Hermes-native cron job. Runs against the LIVE inovaide.com — every run creates a brand-new user.
 
 ## Schedule

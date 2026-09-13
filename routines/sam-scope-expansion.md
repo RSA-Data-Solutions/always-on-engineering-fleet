@@ -1,5 +1,7 @@
 # Sam-bot scope expansion for max-bug-finding mode
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 The original Routine 5 spec capped Sam at 5 files / 100 lines per fix
 to be conservative. With max-bug-finding mode generating 10-15 issues
 per day, Sam needs to handle more breadth without losing the safety

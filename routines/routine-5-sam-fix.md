@@ -1,5 +1,7 @@
 # Routine 5 — Sam Auto-Fix on Issue Open
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 Paste-ready spec for `claude.ai/code/routines`.
 
 ## Routine name

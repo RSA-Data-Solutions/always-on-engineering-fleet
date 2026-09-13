@@ -1,5 +1,7 @@
 # Claude Code Routines — Cloud-Sandbox Versions
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 These are the rewritten prompts for Routines 1, 2, and 3 in the same
 path-discovery + sequential-roles pattern that fixed Routine 4. Paste each
 prompt into the matching routine in `claude.ai/code/routines`.
