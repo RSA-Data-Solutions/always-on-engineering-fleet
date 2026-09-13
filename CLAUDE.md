@@ -15,6 +15,13 @@ To launch the fleet against a project:
    target project (repo path, test command, credentials, known quirks).
 3. Launch the CTO subagent using `agents/ram.md`.
 
+**The fleet now runs live**, not only as ad-hoc subagent launches — see
+[`OPERATIONS.md`](OPERATIONS.md) for the actual running system: Paperclip (org chart,
+task delegation), Hermes (execution, Slack/Telegram), and llama.cpp (local inference).
+`routines/*.md` describe the original ad-hoc-launch design and predate this; treat
+`OPERATIONS.md` as current for anything about how work actually gets delegated and
+reported today.
+
 ## Key rules
 
 - **Never modify agent files without going through the self-improvement loop** (contexts/self-improvement.md).

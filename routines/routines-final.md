@@ -1,5 +1,7 @@
 # Claude Code Routines — 15-run cap + fix-and-retest loop
 
+> **Superseded**: this describes the original ad-hoc-launch design. The fleet now runs live via Paperclip + Hermes — see [`../OPERATIONS.md`](../OPERATIONS.md) for how work is actually delegated and reported today.
+
 Updated routine plan. Two changes from the previous version:
 
 1. Scheduled runs compressed to fit 15/day cap (was 19).
