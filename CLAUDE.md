@@ -30,9 +30,9 @@ To launch the fleet against a project:
 
 | Project | Context | Repo |
 |---------|---------|------|
-| IBMiMCP | contexts/ibmimcp.md | /Users/Sashi/Documents/projects/IBMiMCP |
-| iNova | contexts/inova.md | /Users/Sashi/Documents/projects/iNova |
-| Self | contexts/self-improvement.md | /Users/Sashi/Documents/projects/always-on-engineering-fleet |
+| IBMiMCP | contexts/ibmimcp.md | /home/sashi/Documents/projects/RSA/IBMiMCP |
+| iNova | contexts/inova.md | /home/sashi/Documents/projects/RSA/inova |
+| Self | contexts/self-improvement.md | /home/sashi/Documents/projects/RSA/always-on-engineering-fleet |
 
 ## Adding a new project
 

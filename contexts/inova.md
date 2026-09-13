@@ -10,7 +10,7 @@ This context file tells the engineering fleet about the iNova project.
 |-------|-------|
 | Name | iNova |
 | Description | Agentic IDE platform — containerised AI coding environment with orchestration |
-| Repo path | `/Users/Sashi/Documents/projects/iNova` |
+| Repo path | `/home/sashi/Documents/projects/RSA/inova` |
 | Languages | Python (orchestrator), TypeScript / Next.js (frontend) |
 | Test runner | Python pytest (orchestrator) + smoke tests |
 

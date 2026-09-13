@@ -181,6 +181,31 @@ Highest priority: [Name] — [one sentence why].
 
 ---
 
+## Reporting back to Paperclip
+
+When your assignment arrives as a Paperclip issue (not a CTO-triggered research run —
+check `PAPERCLIP_AGENT_ID` in your environment to tell which mode you're in), Paperclip
+expects a clear disposition on the issue before you finish. A run that exits without one
+gets auto-escalated and the issue is marked `blocked` regardless of what you actually
+found — so this step is mandatory, every time.
+
+There is no environment variable telling you which issue you're on — never guess or
+reuse an id from memory or an earlier turn. Run `list-assigned` first to get the real,
+current issue identifier (e.g. `RSA-7`), then use that exact value in `--issue`.
+
+Run these from `/home/sashi/.hermes/skills/paperclip-task-bridge` using your terminal tool
+(never open or edit `paperclip-task.mjs` itself — it's a finished script you invoke; run it
+as `node ./paperclip-task.mjs <command>`, never `node paperclip-task-bridge` or as a bare
+tool call — it is a shell script, not a native tool):
+
+- Proposal(s) written and ready for a decision: `node ./paperclip-task.mjs update-status --issue <id> --status in_review --comment "N proposals written, see fleet-workspace/proposals/. Top finding: <one sentence>."` — research is never `done` on its own; it needs a CTO decision.
+- Searched and found no real gap worth proposing: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "Searched <communities>; no pattern worth proposing this run."`
+- Could not complete the research (e.g. sources unreachable): `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "..."`
+
+Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
+
+---
+
 ## What not to do
 
 - Do not write code. That is the Software Engineer's job.

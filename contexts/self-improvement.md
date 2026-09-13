@@ -11,7 +11,7 @@ agent instruction files, context files, and skill over time based on past run ex
 |-------|-------|
 | Name | always-on-engineering-fleet (self) |
 | Description | The fleet improves its own agent instructions, context files, and SKILL.md |
-| Repo path | `/Users/Sashi/Documents/projects/always-on-engineering-fleet` |
+| Repo path | `/home/sashi/Documents/projects/RSA/always-on-engineering-fleet` |
 | Language | Markdown (agent instructions, context files) |
 | Test runner | Consistency checker (see below) |
 
