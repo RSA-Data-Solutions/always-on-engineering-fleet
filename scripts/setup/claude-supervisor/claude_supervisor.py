@@ -2,10 +2,20 @@
 """Claude Supervisor daemon.
 
 Polls Paperclip for issues in `in_review` status across the fleet's one
-project, asks Claude for an independent second opinion, and records the
-result as a Paperclip approval request. It never changes an issue's status,
-never touches GitHub, never writes to any repo, and holds no credential
-except its own scoped Paperclip API key.
+project, asks Claude for an independent second opinion, and posts it as an
+issue comment (escalating to a `request_board_approval` approval too, only
+when the verdict isn't a clean "agree" — see file_board_escalation). It
+never changes an issue's status, never touches GitHub, never writes to any
+repo.
+
+Reads use its own scoped, run-bound Paperclip API key (injected per-run by
+the `process` adapter). The two write calls (file_review_comment,
+file_board_escalation) instead use a separate board-level key loaded from
+.env — a deliberate, documented workaround for upstream Paperclip bug
+paperclipai/paperclip#13708, under which a scoped-less heartbeat run's own
+key 403s on any issue write, even to an issue it just checked out itself.
+See board_workaround_key()'s docstring before touching this. Revert to the
+run-scoped key once #13708 ships (fix PR #13650, open as of 2026-09-22).
 
 Claude is called via the `claude` (Claude Code) CLI in one-shot print mode,
 not the Anthropic API/SDK — this draws on a Claude subscription's usage
@@ -29,6 +39,14 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
+
+# Ensure stdout/stderr are unbuffered even when the interpreter isn't
+# started with `python3 -u` (e.g. via `env python3 script.py` from
+# Paperclip's process adapter) — otherwise a crash before a flush can look
+# like a silent, output-less failure in the run log.
+sys.stdout.reconfigure(line_buffering=True)
+sys.stderr.reconfigure(line_buffering=True)
 
 STATE_FILE = pathlib.Path(
     os.environ.get(
@@ -36,6 +54,42 @@ STATE_FILE = pathlib.Path(
         str(pathlib.Path.home() / ".claude-supervisor" / "reviewed.json"),
     )
 )
+
+ENV_FILE = pathlib.Path(
+    os.environ.get("CLAUDE_SUPERVISOR_ENV_FILE", str(pathlib.Path.home() / ".claude-supervisor" / ".env"))
+)
+
+
+def board_workaround_key():
+    """Read PAPERCLIP_BOARD_KEY_WORKAROUND from .env directly.
+
+    Paperclip's `process` adapter injects a fresh, run-scoped agent JWT per
+    invocation and does NOT source this directory's .env, so this can't come
+    from os.environ the way PAPERCLIP_API_KEY does — it has to be read from
+    disk on every call.
+
+    This key exists only to work around a confirmed upstream Paperclip bug
+    (paperclipai/paperclip#13708, fix open unmerged as PR #13650): a
+    scoped-less heartbeat run's own JWT gets 403
+    cross_issue_influence_run_context_required on every issue-comment write,
+    even to an issue the run itself just checked out, because the
+    cross-issue-influence guard fail-closes before the same-issue exemption
+    is ever evaluated — confirmed by direct testing on 2026-09-22 (raw HTTP
+    with a matching run-id header, a completed checkout, and a static agent
+    key all 403 identically). A board-level key is the only thing that
+    bypasses the guard today.
+    Revoke this key ("claude-supervisor-comment-workaround-PC13708" in
+    Paperclip) and delete it from .env once #13708 ships in a release —
+    do not leave it in place "just in case" past that.
+    """
+    if not ENV_FILE.exists():
+        raise RuntimeError(f"{ENV_FILE} not found — cannot load PAPERCLIP_BOARD_KEY_WORKAROUND")
+    for line in ENV_FILE.read_text().splitlines():
+        line = line.strip()
+        if line.startswith("PAPERCLIP_BOARD_KEY_WORKAROUND="):
+            return line.split("=", 1)[1].strip()
+    raise RuntimeError(f"PAPERCLIP_BOARD_KEY_WORKAROUND not set in {ENV_FILE}")
+
 
 # Local repo paths, used only for a best-effort commit lookup so a review can
 # see real diff content instead of relying solely on an agent's self-report.
@@ -68,13 +122,24 @@ def save_state(state):
 def paperclip(*args):
     """Run the paperclipai CLI and return parsed JSON.
 
-    Flags below match doc/CLI.md in https://github.com/paperclipai/paperclip
-    as of 2026-09-21 (`--company-id`, not `-C`; no `--project-id` on `issue
-    list`, only `--status`/`--assignee-agent-id`/`--match`). Re-check that
-    file if this starts failing after a Paperclip upgrade — the project
-    moves fast and this is the only function that should need to change.
+    Reverified directly against the installed `paperclipai` CLI on
+    2026-09-22 (not just doc/CLI.md): `-C`/`--company-id` both work;
+    `issue list` now also accepts `--project-id` (added since this was
+    first written — not used here since the fleet still runs one company/
+    project). Re-check `paperclipai <cmd> --help` if this starts failing
+    after a Paperclip upgrade — the project moves fast.
     """
-    cmd = ["paperclipai", *args, "--api-key", os.environ["PAPERCLIP_API_KEY"], "--json"]
+    cmd = ["paperclipai", *args, "--api-key", os.environ["PAPERCLIP_API_KEY"]]
+    # The CLI documents `--run-id` as falling back to $PAPERCLIP_RUN_ID, but
+    # that fallback did not actually apply to `issue comment` in practice
+    # (confirmed 2026-09-22: the env var was present and correct, yet the
+    # call still 403'd with "no run to attribute this write to" until
+    # --run-id was passed explicitly). Pass it explicitly everywhere rather
+    # than trust the documented env fallback.
+    run_id = os.environ.get("PAPERCLIP_RUN_ID")
+    if run_id:
+        cmd += ["--run-id", run_id]
+    cmd += ["--json"]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
     if result.returncode != 0:
         raise RuntimeError(f"paperclipai {' '.join(args)} failed: {result.stderr.strip()}")
@@ -88,6 +153,12 @@ def list_review_candidates(company_id):
     return paperclip("issue", "list", "--company-id", company_id, "--status", "in_review")
 
 
+def list_issue_comments(issue_id):
+    # Comments are NOT embedded in `issue list`/`issue get` output (verified
+    # against a real issue on 2026-09-22) — they're a separate endpoint.
+    return paperclip("issue", "comments", issue_id)
+
+
 def find_repo_context(issue):
     """Best-effort: grep local repo git logs for a commit mentioning this
     issue's key (e.g. "RSA-42"). Returns a diff string or None.
@@ -96,7 +167,7 @@ def find_repo_context(issue):
     that Paperclip issues carry an explicit repo/commit link, or that commit
     messages include the issue key. Treat a miss as normal, not an error.
     """
-    key = issue.get("key") or issue.get("id") or ""
+    key = issue.get("identifier") or issue.get("id") or ""
     if not key:
         return None
     for repo_path in REPO_MAP.values():
@@ -116,10 +187,11 @@ def find_repo_context(issue):
     return None
 
 
-def build_review_prompt(issue, diff_context):
-    comments = issue.get("comments", [])
+def build_review_prompt(issue, comments, diff_context):
     comment_text = "\n\n".join(
-        f"[{c.get('author', '?')} @ {c.get('createdAt', '?')}]\n{c.get('body', '')}"
+        f"[{c.get('authorType', '?')}"
+        f"{':' + c.get('authorAgentId', '') if c.get('authorAgentId') else ''}"
+        f" @ {c.get('createdAt', '?')}]\n{c.get('body', '')}"
         for c in comments
     )
     parts = [
@@ -201,21 +273,64 @@ def call_claude(prompt):
     return result.stdout.strip()
 
 
-def file_approval_request(company_id, issue, review_text):
-    """Record the review as a Paperclip approval request rather than a
-    comment or status change. Real syntax (doc/CLI.md):
-    `approval create --company-id <id> --type <type> --payload '<json>'
-    [--issue-ids <id>]` — note `--payload`, not `--payload-json`, and no
-    `--requested-by-agent-id` flag: identity comes from whichever API key
-    authenticates the call (claude-supervisor's own scoped key). Only
-    `hire_agent` appears as an example `--type` value in the docs; run
-    `paperclipai openapi` to confirm whether `--type` is a fixed enum or a
-    free-form string before trusting "claude_review" here in production.
+def parse_verdict(review_text):
+    """Pull the VERDICT line out of Claude's structured response. Returns
+    'agree' / 'disagree' / 'needs-human-look', defaulting to the safest
+    (most visible) option if the text didn't follow the requested format."""
+    for line in review_text.splitlines():
+        line = line.strip().lower()
+        if line.startswith("1. verdict:") or line.startswith("verdict:"):
+            for v in ("disagree", "needs-human-look", "agree"):
+                if v in line:
+                    return v
+    return "needs-human-look"
+
+
+def file_review_comment(issue_id, issue, review_text):
+    """Post the review as an issue comment. `approval create --type` turned
+    out to be a fixed enum (hire_agent|approve_ceo_strategy|
+    budget_override_required|request_board_approval — confirmed via
+    `paperclipai openapi` on 2026-09-22), none of which fit a routine code
+    review, and using request_board_approval for every review — including
+    plain agreements — would spam the board queue. A comment is always
+    visible on the issue thread and matches "advisory, never a status
+    change" exactly. Real syntax (doc/CLI.md, reverified 2026-09-22):
+    `issue comment <issueId> --body <text> --api-key <key> --json`.
+
+    Uses board_workaround_key(), not the run's own PAPERCLIP_API_KEY — see
+    that function's docstring for why (paperclipai/paperclip#13708). Comments
+    posted this way show up authored by the board user, not the Claude
+    Supervisor agent; the "**Claude Supervisor review**" prefix on the body
+    is what actually identifies them until #13708 is fixed.
     """
-    issue_id = issue.get("id") or issue.get("key")
+    body = f"**Claude Supervisor review**\n\n{review_text}"
+    cmd = [
+        "paperclipai",
+        "issue",
+        "comment",
+        issue_id,
+        "--body",
+        body,
+        "--api-key",
+        board_workaround_key(),
+        "--json",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError(f"issue comment failed: {result.stderr.strip()}")
+    return json.loads(result.stdout)
+
+
+def file_board_escalation(company_id, issue_id, issue, review_text):
+    """File a request_board_approval approval — only called when Claude's
+    verdict isn't a clean 'agree', so the board queue only gets entries that
+    actually need a human decision, not routine agreements.
+
+    Uses board_workaround_key() for the same reason as file_review_comment.
+    """
     payload = json.dumps(
         {
-            "summary": f"Claude Supervisor review of {issue.get('key', issue_id)}: "
+            "summary": f"Claude Supervisor flagged {issue.get('identifier', issue_id)}: "
             f"{issue.get('title', '')}",
             "review": review_text,
         }
@@ -227,9 +342,9 @@ def file_approval_request(company_id, issue, review_text):
         "--company-id",
         company_id,
         "--api-key",
-        os.environ["PAPERCLIP_API_KEY"],
+        board_workaround_key(),
         "--type",
-        "claude_review",
+        "request_board_approval",
         "--payload",
         payload,
         "--issue-ids",
@@ -247,18 +362,24 @@ def run_once(args, state):
     reviewed = state["reviewed_issue_updated_at"]
     new_reviews = 0
     for issue in candidates:
-        key = issue.get("key") or issue.get("id")
+        key = issue.get("identifier") or issue.get("id")
+        issue_id = issue.get("id")
         updated_at = issue.get("updatedAt", "")
         if reviewed.get(key) == updated_at:
             continue  # already reviewed this exact version of the issue
         print(f"[{datetime.datetime.now().isoformat()}] reviewing {key}: {issue.get('title', '')}")
         if args.dry_run:
-            print("  (dry run: skipping Claude call and approval request)")
+            print("  (dry run: skipping Claude call and comment)")
             continue
         diff_context = find_repo_context(issue)
-        prompt = build_review_prompt(issue, diff_context)
+        comments = list_issue_comments(issue_id)
+        prompt = build_review_prompt(issue, comments, diff_context)
         review_text = call_claude(prompt)
-        file_approval_request(args.company_id, issue, review_text)
+        file_review_comment(issue_id, issue, review_text)
+        verdict = parse_verdict(review_text)
+        if verdict != "agree":
+            file_board_escalation(args.company_id, issue_id, issue, review_text)
+            print(f"  verdict={verdict}: also filed a board escalation")
         reviewed[key] = updated_at
         new_reviews += 1
     if not args.dry_run:
@@ -300,4 +421,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        print("FATAL:", file=sys.stderr)
+        traceback.print_exc()
+        sys.exit(1)

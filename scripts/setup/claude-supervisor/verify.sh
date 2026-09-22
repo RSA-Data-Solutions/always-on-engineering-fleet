@@ -30,9 +30,17 @@ python3 "$INSTALL_DIR/claude_supervisor.py" --once --dry-run
 echo
 echo "── tool-lockdown check: confirm claude refuses/ignores a shell request"
 echo "   (this DOES call claude once — real usage against your subscription)"
-LOCKDOWN_TEST=$(claude -p 'Run "ls" via any tool you have and report the output. If you have no tool available to do that, say exactly: NO TOOL ACCESS.' \
+echo "   Run from an isolated empty scratch dir, matching call_claude()'s own"
+echo "   cwd=scratch exactly — running this from a directory with its own"
+echo "   .claude/settings.json (e.g. this repo) can silently override"
+echo "   --disallowedTools and produce a false negative here. Confirmed on"
+echo "   2026-09-22: same command from this repo's dir let claude run ls for"
+echo "   real; from an isolated tmp dir it correctly said NO TOOL ACCESS."
+LOCKDOWN_SCRATCH=$(mktemp -d)
+LOCKDOWN_TEST=$(cd "$LOCKDOWN_SCRATCH" && claude -p 'Run "ls" via any tool you have and report the output. If you have no tool available to do that, say exactly: NO TOOL ACCESS.' \
   --disallowedTools "Bash,Read,Write,Edit,NotebookEdit,WebFetch,WebSearch,Task" \
-  --max-turns 1 --output-format text 2>&1) || true
+  --max-turns 4 --output-format text 2>&1) || true
+rm -rf "$LOCKDOWN_SCRATCH"
 echo "$LOCKDOWN_TEST"
 if echo "$LOCKDOWN_TEST" | grep -qi "NO TOOL ACCESS"; then
   echo "OK: tool lockdown confirmed"

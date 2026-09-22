@@ -1,14 +1,23 @@
 [Unit]
-Description=Claude Supervisor — advisory review daemon for the Paperclip/Hermes fleet
-After=network-online.target
+Description=Claude Supervisor — trigger one advisory-review heartbeat via Paperclip
+After=network-online.target paperclipai.service
 Wants=network-online.target
 
 [Service]
-Type=simple
-EnvironmentFile=%h/.claude-supervisor/.env
-ExecStart=/usr/bin/env python3 %h/.claude-supervisor/claude_supervisor.py
-Restart=on-failure
-RestartSec=30
-
-[Install]
-WantedBy=default.target
+Type=oneshot
+# Paperclip's own `process` adapter spawns claude_supervisor.py --once for
+# this run, injecting PAPERCLIP_RUN_ID + a fresh scoped PAPERCLIP_API_KEY —
+# see agent 7e92a434-b670-4c72-8fbf-78ecbff0f52b's adapterConfig. Do not go
+# back to running claude_supervisor.py directly as a long-lived daemon: it
+# needs to run as a Paperclip heartbeat run for reads to work at all.
+#
+# Note the run's own scoped key still can't post the comment/approval writes
+# even so — that's a confirmed upstream Paperclip bug, not something fixable
+# here (paperclipai/paperclip#13708: a scoped-less heartbeat run's own JWT
+# 403s cross_issue_influence_run_context_required on every issue write, even
+# to an issue it just checked out itself, because the guard fail-closes
+# before the same-issue exemption runs). claude_supervisor.py works around
+# it with a separate board-level key for writes only — see
+# board_workaround_key() in that script. Revert that workaround once #13708
+# ships (fix PR #13650, open unmerged as of 2026-09-22).
+ExecStart=/usr/bin/env paperclipai agent heartbeat:invoke 7e92a434-b670-4c72-8fbf-78ecbff0f52b

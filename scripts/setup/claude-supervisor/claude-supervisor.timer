@@ -1,0 +1,13 @@
+[Unit]
+Description=Claude Supervisor — periodic advisory-review heartbeat trigger
+
+[Timer]
+# Deliberately slower than Paperclip's own ~30s heartbeat cadence for cost
+# control (see README.md) — keep this interval unless there's a specific
+# reason to tighten it.
+OnBootSec=60
+OnUnitActiveSec=300
+AccuracySec=30
+
+[Install]
+WantedBy=timers.target
