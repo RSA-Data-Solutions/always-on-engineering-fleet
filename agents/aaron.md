@@ -22,7 +22,7 @@ The CTO passes you a deployment order file (`deploy-N.json`):
   "start_command": "node dist/server.js",
   "environment": {
     "PORT": "3051",
-    "ADMIN_API_KEY": "REDACTED_ADMIN_API_KEY"
+    "ADMIN_API_KEY": "<ADMIN_API_KEY>"
   },
   "health_check_url": "http://localhost:3051/health",
   "endpoint_smoke_tests": [
@@ -216,7 +216,7 @@ Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your ru
 ## IBMiMCP-specific notes
 
 - Server port: `3051`
-- API key header: `x-api-key: REDACTED_ADMIN_API_KEY`
+- API key header: `x-api-key: <ADMIN_API_KEY>`
 - MCP endpoint: `POST /mcp` (JSON-RPC 2.0)
 - Good smoke test tools: `listActiveJobs`, `getSystemStatus`, `listTables`
 - Tool count should be ≥130 (was 130+ before, now 131+ after `analyzeObjectDependencies`)
