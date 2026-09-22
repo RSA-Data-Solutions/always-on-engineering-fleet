@@ -1,8 +1,14 @@
 # Setup scripts
 
+- **`paperclip-hermes/`** — real, verified build plan for installing
+  Paperclip and onboarding the already-installed Hermes as actual Paperclip
+  agents (see `paperclip-hermes/README.md`). Do this first — as of
+  2026-09-21, Paperclip was not actually installed on the host despite
+  `OPERATIONS.md` describing it as live.
 - **`claude-supervisor/`** — build plan and scripts for the Claude Supervisor
-  advisory role (see `claude-supervisor/README.md`). Run on the Ubuntu host
-  that runs Paperclip/Hermes, not from this Mac.
+  advisory role (see `claude-supervisor/README.md`). Depends on the above
+  being done first. Run on the Ubuntu host that runs Paperclip/Hermes, not
+  from this Mac.
 - **`phase-1-2-3.sh`** (below) — earlier, unrelated iNova QA-fleet setup
   (bypass secret, GitHub labels, health endpoints). Predates Paperclip/Hermes.
 

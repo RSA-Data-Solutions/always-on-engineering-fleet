@@ -4,12 +4,13 @@ This builds the "Claude Supervisor role" proposed in
 [`paperclip-hermes-always-on-engineering-fleet-migration-plan.md`](../../../paperclip-hermes-always-on-engineering-fleet-migration-plan.md#claude-supervisor-role).
 That document explains *why*; this one is the concrete, runnable *how*.
 
-**Scope of this pass:** Claude Supervisor only. A separate, later pass will
-turn the rest of the fleet's manual setup (llama.cpp, Paperclip, Hermes, the
-five existing agents — all currently hand-built per `OPERATIONS.md`, with no
-setup scripts) into reproducible automation. Don't conflate the two — this
-directory only stands up the new advisory layer alongside the fleet that's
-already running.
+**Scope of this pass:** Claude Supervisor only. Installing Paperclip itself
+and onboarding Hermes as real Paperclip agents (Ram as `hermes_gateway`,
+Aaron/Dhira/Lynn/Sam as `hermes_local`) is a prerequisite covered in
+[`../paperclip-hermes/README.md`](../paperclip-hermes/README.md) — do that
+first. `OPERATIONS.md` describes that org chart as already live; as of
+2026-09-21 it wasn't (Paperclip was never installed on the host), so nothing
+in this directory can do anything useful until that's done for real.
 
 **I cannot run any of this.** This was written from a Mac Claude Code
 session with no access to the Ubuntu host (`sashi-llm`) that actually runs
@@ -20,56 +21,59 @@ there, by you, after the manual steps below.
 
 ## What's verified vs. assumed
 
-Be honest with yourself about this before running anything:
+Be honest with yourself about this before running anything. Status as of
+2026-09-21, after Paperclip turned out to not actually be installed (see
+`../paperclip-hermes/README.md`) — this downgraded a lot of what the
+previous version of this section called "verified," since it had been
+sourced from `OPERATIONS.md`'s claims rather than the real project.
 
-**Verified** (directly confirmed in `OPERATIONS.md`, which documents the
-system as it actually runs, checked 2026-09-12):
-- `paperclipai issue list -C <companyId> --api-key <key> --json` works and
-  returns issues.
-- `paperclipai approval create -C <companyId> --api-key <key> --type
-  request_board_approval --requested-by-agent-id <id> --payload '{...}'
-  --json` works, and an **agent-scoped key can call it** — only
-  `approval approve`/`reject` require board access (403 otherwise).
-- The company id (`0c265070-3974-497a-99ee-cf942ffe139d`, RSAData) and
-  project id (`b9bb008e-7771-4bc7-aad8-71e2faa3307f`, "Always-On Engineering
-  Fleet") are real and current. All work — across IBMiMCP, iNova, and the
-  fleet's own repo — is scoped to this single Paperclip project.
-- Every agent (Aaron/Dhira/Lynn/Sam) ends a run by setting a disposition via
-  `node ./paperclip-task.mjs update-status --issue <id> --status <done|blocked|in_review> --comment "..."`,
-  run from `/home/sashi/.hermes/skills/paperclip-task-bridge`. `in_review`
-  specifically means "ready but needs a human or CTO look before it counts
-  as done" — that's the exact hook this daemon uses.
-- Services on this host run as **systemd --user units under `sashi`**, with
-  linger enabled — not as separate per-service system accounts. This build
-  follows that pattern rather than the generic separate-service-account
-  model described earlier in the migration plan, because that model was
-  never actually implemented on the real host.
+**Verified** (confirmed directly against
+[`paperclipai/paperclip`](https://github.com/paperclipai/paperclip)'s
+`doc/CLI.md`, the real upstream project — 81k★, MIT, not a guess):
+- `paperclipai issue list --company-id <id> --status in_review --api-key
+  <key> --json` — real flags, confirmed in the docs.
+- `paperclipai approval create --company-id <id> --type <type> --payload
+  '<json>' [--issue-ids <id>] --api-key <key> --json` — real flags. Identity
+  comes from the API key, not a `--requested-by-agent-id` flag (that was a
+  guess from `OPERATIONS.md`'s illustrative example, which turns out not to
+  match the real CLI syntax at all — treat every command example in
+  `OPERATIONS.md` with the same suspicion until independently re-checked).
+- `paperclipai token agent create --company-id <id> --agent <agent-id> --name
+  <name>` mints a scoped agent API key — this is how claude-supervisor's own
+  `PAPERCLIP_API_KEY` gets created.
+- Paperclip is a real Node.js server + React UI with an embedded Postgres
+  (no external DB setup), installs via `curl -fsSLO
+  https://paperclip.ing/install.sh && bash install.sh`, and runs as a
+  systemd **user** unit on Linux — `OPERATIONS.md`'s port (3100) and
+  service-shape claims were directionally right even though the install
+  itself hadn't happened.
+- Paperclip ships native `hermes_local` / `hermes_gateway` adapters
+  (confirmed in `doc/HERMES_GATEWAY_ONBOARDING.md`) for exactly the Hermes
+  setup already on this host, and a native `claude_local` adapter (harness
+  `claude`, credential `ANTHROPIC_API_KEY`) — see "Alternative approach"
+  below, this is no longer speculative.
 
-**Assumed / not independently confirmed — verify before depending on them:**
-- The exact `paperclipai` flag names used in `claude_supervisor.py` beyond
-  what's quoted above (e.g. whether `issue list` takes `--project-id` or a
-  differently-named flag, whether the JSON shape has `key`/`id`/`updatedAt`/
-  `comments` fields exactly as the script expects). Run `paperclipai --help`,
-  `paperclipai issue --help`, and `paperclipai issue list -C <companyId>
-  --project-id <projectId> --json | head -c 2000` on the real host first,
-  and adjust `claude_supervisor.py` if the shape differs — it's the only
-  file that should need to change.
-- Whether Paperclip issues carry any explicit link to a repo/commit. Nothing
-  in `OPERATIONS.md` confirms this, so `find_repo_context()` falls back to a
-  heuristic `git log --grep=<issue-key>` across the three known local repos.
-  A miss is expected and handled (the review says so and lowers confidence),
-  not a bug.
-- Whether Hermes (the CLI, not Paperclip) can be configured to use Anthropic
-  as a model provider directly, the same way `hermes_local` currently points
-  at the local `llama-qwen.service` endpoint. If it can, that would be a
-  cleaner integration than this standalone daemon — see "Alternative
-  approach" below. This build does not depend on that being true.
+**Still assumed / not independently confirmed:**
+- The company id below (`0c265070-3974-497a-99ee-cf942ffe139d`) —
+  `OPERATIONS.md`'s claim, unverifiable until Paperclip is actually
+  installed and `paperclipai company list` can be run for real.
+- Whether Paperclip issues carry any explicit link to a repo/commit —
+  `find_repo_context()` falls back to a heuristic `git log --grep=<issue-key>`
+  across the three known local repos. A miss is expected and handled (the
+  review says so and lowers confidence), not a bug.
+- The exact JSON field names on an issue object (`key`/`id`/`updatedAt`/
+  `comments` as `claude_supervisor.py` expects) — `doc/CLI.md` documents the
+  command surface, not the response schema. Run `paperclipai issue list
+  --company-id <id> --json | head -c 2000` once real data exists and adjust
+  if the shape differs.
+- Whether `--type` on `approval create` is a free-form string or a fixed
+  enum — only `hire_agent` appears as an example. `paperclipai openapi`
+  dumps the real schema; check it before trusting `claude_review` as a type.
 - **The `claude` CLI flags used in `call_claude()`** (`-p`, `--model`,
   `--disallowedTools`, `--max-turns`, `--output-format`) and the exact
-  headless-auth command (`claude setup-token`). These are accurate as of
-  this writing but unverified against the real host's installed CLI version
-  — run `claude --help` there first, and definitely run `verify.sh`'s
-  tool-lockdown check before trusting the lockdown in production.
+  headless-auth command (`claude setup-token`) — unrelated to Paperclip,
+  still unverified against the real host. Run `claude --help` there, and
+  definitely run `verify.sh`'s tool-lockdown check before trusting it.
 
 ## Claude via CLI, not API key
 
@@ -177,13 +181,20 @@ assume" standard the rest of this repo holds itself to.
 
 ## Alternative approach (not built here, worth investigating)
 
-If Hermes turns out to support Anthropic as a first-class model provider
-(the same way `hermes_local`'s `adapterConfig.model` currently points at
-`qwen3-coder-30b-a3b-q4-k-xl`), a cleaner integration would be a *real*
-Paperclip agent using the normal `hermes_local` heartbeat/task_bridge flow,
-just pointed at Claude instead of the local model — no standalone daemon,
-no separate polling loop, full reuse of the existing dispatch and reporting
-mechanism. Check `hermes --help` / Hermes's own provider configuration docs
-for this before assuming it isn't possible. If it is, this whole directory
-becomes unnecessary and the "Adding a new agent" procedure in `OPERATIONS.md`
-is all you need.
+Paperclip ships a native `claude_local` adapter — it runs the `claude` CLI
+directly as a per-heartbeat child process, the same way `hermes_local` runs
+`hermes`. If that adapter's config supports restricting tool access (check
+with `paperclipai adapter config-schema claude_local` once Paperclip is
+installed), Claude Supervisor should become a real Paperclip agent using
+that adapter instead of the standalone daemon in this directory — full reuse
+of Paperclip's own heartbeat/dispatch/reporting mechanism, no separate poll
+loop to maintain.
+
+**Don't switch to it until that question is answered.** The native adapter's
+documented credential is `ANTHROPIC_API_KEY` (metered billing, not the
+`claude` CLI's subscription auth this build uses), and nothing in the docs
+confirms it exposes a tool-restriction knob — if it doesn't, using it would
+silently hand Claude Supervisor full Claude Code tool access (Bash, Read,
+Write, Edit) by default, which defeats the entire "advisory only" design.
+The standalone daemon's explicit `--disallowedTools` lockdown is a known
+quantity; the native adapter's tool-access behavior currently isn't.

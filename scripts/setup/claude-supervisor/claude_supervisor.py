@@ -68,12 +68,11 @@ def save_state(state):
 def paperclip(*args):
     """Run the paperclipai CLI and return parsed JSON.
 
-    VERIFY before relying on this: the exact subcommand and flag names below
-    are transcribed from the working examples in OPERATIONS.md
-    (`paperclipai issue list -C <companyId> --api-key <key> --json`), not
-    independently confirmed against `paperclipai --help` on the real host.
-    Run that against the live CLI before trusting this in production — if
-    flags differ, this is the only function that needs to change.
+    Flags below match doc/CLI.md in https://github.com/paperclipai/paperclip
+    as of 2026-09-21 (`--company-id`, not `-C`; no `--project-id` on `issue
+    list`, only `--status`/`--assignee-agent-id`/`--match`). Re-check that
+    file if this starts failing after a Paperclip upgrade — the project
+    moves fast and this is the only function that should need to change.
     """
     cmd = ["paperclipai", *args, "--api-key", os.environ["PAPERCLIP_API_KEY"], "--json"]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -82,9 +81,11 @@ def paperclip(*args):
     return json.loads(result.stdout)
 
 
-def list_review_candidates(company_id, project_id):
-    issues = paperclip("issue", "list", "-C", company_id, "--project-id", project_id)
-    return [i for i in issues if i.get("status") == "in_review"]
+def list_review_candidates(company_id):
+    # Paperclip's CLI has no --project-id filter on `issue list`; the fleet
+    # currently runs everything under one company/project anyway (see
+    # OPERATIONS.md), so company-scoped + --status is sufficient.
+    return paperclip("issue", "list", "--company-id", company_id, "--status", "in_review")
 
 
 def find_repo_context(issue):
@@ -200,17 +201,22 @@ def call_claude(prompt):
     return result.stdout.strip()
 
 
-def file_approval_request(company_id, requested_by_agent_id, issue, review_text):
+def file_approval_request(company_id, issue, review_text):
     """Record the review as a Paperclip approval request rather than a
-    comment or status change — this is the one write primitive in
-    OPERATIONS.md already confirmed to work from an agent-scoped key without
-    granting that key board authority (agent keys get 403 on approve/reject,
-    but Ram's own example shows an agent key CAN create the request)."""
+    comment or status change. Real syntax (doc/CLI.md):
+    `approval create --company-id <id> --type <type> --payload '<json>'
+    [--issue-ids <id>]` — note `--payload`, not `--payload-json`, and no
+    `--requested-by-agent-id` flag: identity comes from whichever API key
+    authenticates the call (claude-supervisor's own scoped key). Only
+    `hire_agent` appears as an example `--type` value in the docs; run
+    `paperclipai openapi` to confirm whether `--type` is a fixed enum or a
+    free-form string before trusting "claude_review" here in production.
+    """
+    issue_id = issue.get("id") or issue.get("key")
     payload = json.dumps(
         {
-            "summary": f"Claude Supervisor review of {issue.get('key', issue.get('id'))}: "
+            "summary": f"Claude Supervisor review of {issue.get('key', issue_id)}: "
             f"{issue.get('title', '')}",
-            "action": "claude_review",
             "review": review_text,
         }
     )
@@ -218,16 +224,16 @@ def file_approval_request(company_id, requested_by_agent_id, issue, review_text)
         "paperclipai",
         "approval",
         "create",
-        "-C",
+        "--company-id",
         company_id,
         "--api-key",
         os.environ["PAPERCLIP_API_KEY"],
         "--type",
-        "request_board_approval",
-        "--requested-by-agent-id",
-        requested_by_agent_id,
+        "claude_review",
         "--payload",
         payload,
+        "--issue-ids",
+        issue_id,
         "--json",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -237,7 +243,7 @@ def file_approval_request(company_id, requested_by_agent_id, issue, review_text)
 
 
 def run_once(args, state):
-    candidates = list_review_candidates(args.company_id, args.project_id)
+    candidates = list_review_candidates(args.company_id)
     reviewed = state["reviewed_issue_updated_at"]
     new_reviews = 0
     for issue in candidates:
@@ -252,7 +258,7 @@ def run_once(args, state):
         diff_context = find_repo_context(issue)
         prompt = build_review_prompt(issue, diff_context)
         review_text = call_claude(prompt)
-        file_approval_request(args.company_id, args.agent_id, issue, review_text)
+        file_approval_request(args.company_id, issue, review_text)
         reviewed[key] = updated_at
         new_reviews += 1
     if not args.dry_run:
@@ -263,13 +269,6 @@ def run_once(args, state):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--company-id", dest="company_id", default=os.environ.get("PAPERCLIP_COMPANY_ID"))
-    p.add_argument("--project-id", dest="project_id", default=os.environ.get("PAPERCLIP_PROJECT_ID"))
-    p.add_argument(
-        "--agent-id",
-        dest="agent_id",
-        default=os.environ.get("CLAUDE_SUPERVISOR_AGENT_ID"),
-        help="claude-supervisor's own Paperclip agent id, used as --requested-by-agent-id",
-    )
     p.add_argument(
         "--poll-interval",
         type=int,
@@ -285,11 +284,8 @@ def main():
     )
     args = p.parse_args()
 
-    missing = [n for n in ("company_id", "project_id") if not getattr(args, n)]
-    if missing:
-        p.error(f"missing required config: {', '.join(missing)} (env or flag)")
-    if not args.dry_run and not args.agent_id:
-        p.error("--agent-id (or CLAUDE_SUPERVISOR_AGENT_ID) is required unless --dry-run")
+    if not args.company_id:
+        p.error("missing required config: company_id (env PAPERCLIP_COMPANY_ID or --company-id)")
 
     state = load_state()
     if args.once:
