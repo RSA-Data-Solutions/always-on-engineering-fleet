@@ -64,6 +64,41 @@ system as it actually runs, checked 2026-09-12):
   at the local `llama-qwen.service` endpoint. If it can, that would be a
   cleaner integration than this standalone daemon — see "Alternative
   approach" below. This build does not depend on that being true.
+- **The `claude` CLI flags used in `call_claude()`** (`-p`, `--model`,
+  `--disallowedTools`, `--max-turns`, `--output-format`) and the exact
+  headless-auth command (`claude setup-token`). These are accurate as of
+  this writing but unverified against the real host's installed CLI version
+  — run `claude --help` there first, and definitely run `verify.sh`'s
+  tool-lockdown check before trusting the lockdown in production.
+
+## Claude via CLI, not API key
+
+This build calls Claude through the `claude` (Claude Code) CLI in one-shot
+print mode (`claude -p "..."`) rather than the Anthropic API/SDK. Trade-offs,
+so this is a deliberate choice rather than a default worth forgetting about:
+
+- **Cost**: usage draws on a Claude subscription (Pro/Max) rather than
+  metered per-token API billing — the right call for a homelab budget, at
+  the cost of sharing that plan's usage limits with your interactive coding
+  sessions.
+- **Safety — this is the one that matters.** The Anthropic API only ever
+  returns text; there was no tool-access question. `claude` is a full
+  agentic coding tool with shell/file-write access *by default*. Every call
+  in `claude_supervisor.py` passes `--disallowedTools` naming every built-in
+  tool, `--max-turns 1`, and runs from an empty scratch directory — this is
+  what makes "advisory only, no shell" still true under this design, not
+  just documentation. If you ever modify `call_claude()`, keep the lockdown;
+  don't treat it as boilerplate to trim. `verify.sh` includes a live check
+  that asks Claude to try running `ls` and confirms it can't — run that
+  after any change here, and after any `claude` CLI upgrade.
+- **Auth is a one-time manual step**, same weight as provisioning an API key
+  would have been: either `claude login` (interactive) or `claude
+  setup-token` (built for headless/CI use — verify the exact command) as the
+  `sashi` user on the host, before starting the service.
+
+If you'd rather use the Anthropic API directly instead (isolated, text-only,
+no agentic surface to lock down, but metered billing), swap `call_claude()`
+back to the `anthropic` Python SDK — it's a single self-contained function.
 
 ---
 
@@ -86,10 +121,11 @@ system as it actually runs, checked 2026-09-12):
    this exact shape, use the narrowest key type available and note the gap
    — don't grant broader access to work around a missing key type without
    flagging it.
-3. **Get an Anthropic API key** for this purpose. Treat it like every other
-   credential in `OPERATIONS.md`'s credentials table: never in Git, mode
-   600, scoped to one service identity.
-4. Record the new agent id and both API keys — you'll put them in
+3. **Install and authenticate `claude` (Claude Code CLI) as the `sashi` user**
+   on the host, if not already done — `claude login` (interactive) or
+   `claude setup-token` (headless; verify the exact command). See "Claude
+   via CLI, not API key" below for why this replaces an Anthropic API key.
+4. Record the new agent id and the Paperclip API key — you'll put them in
    `~/.claude-supervisor/.env` on the host (step 1 of "Deploy" below).
 
 ## Deploy (on the Ubuntu host, as `sashi`)

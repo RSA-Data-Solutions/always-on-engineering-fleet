@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 EnvironmentFile=%h/.claude-supervisor/.env
-ExecStart=%h/.claude-supervisor/venv/bin/python3 %h/.claude-supervisor/claude_supervisor.py
+ExecStart=/usr/bin/env python3 %h/.claude-supervisor/claude_supervisor.py
 Restart=on-failure
 RestartSec=30
 

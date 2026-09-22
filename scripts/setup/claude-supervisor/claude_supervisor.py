@@ -5,12 +5,20 @@ Polls Paperclip for issues in `in_review` status across the fleet's one
 project, asks Claude for an independent second opinion, and records the
 result as a Paperclip approval request. It never changes an issue's status,
 never touches GitHub, never writes to any repo, and holds no credential
-except its own scoped Paperclip API key and the Anthropic API key.
+except its own scoped Paperclip API key.
+
+Claude is called via the `claude` (Claude Code) CLI in one-shot print mode,
+not the Anthropic API/SDK — this draws on a Claude subscription's usage
+instead of metered per-token API billing. Because `claude` is itself an
+agentic coding tool with shell/file-write access by default, tool access is
+explicitly locked to nothing on every call (see DISALLOWED_TOOLS below) —
+that lockdown is load-bearing for the "advisory only" design, not a nicety.
 
 See README.md in this directory for the build plan, what is verified vs.
-assumed about the `paperclipai` CLI surface, and the manual setup steps this
-script depends on (a Paperclip agent identity + API key for claude-supervisor
-must already exist before this will do anything useful).
+assumed about the `paperclipai` and `claude` CLI surfaces, and the manual
+setup steps this script depends on (a Paperclip agent identity + API key for
+claude-supervisor, and `claude` authenticated on this host, must already
+exist before this will do anything useful).
 """
 import argparse
 import datetime
@@ -19,6 +27,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import tempfile
 import time
 
 STATE_FILE = pathlib.Path(
@@ -144,16 +153,51 @@ def build_review_prompt(issue, diff_context):
     return "\n\n".join(parts)
 
 
-def call_claude(prompt):
-    import anthropic  # imported lazily so --dry-run works without the SDK installed
+CLAUDE_BIN = os.environ.get("CLAUDE_SUPERVISOR_CLAUDE_BIN", "claude")
 
-    client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from the environment
-    msg = client.messages.create(
-        model=os.environ.get("CLAUDE_SUPERVISOR_MODEL", "claude-sonnet-5"),
-        max_tokens=1024,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return "".join(block.text for block in msg.content if block.type == "text")
+# Tool access is deliberately locked to nothing: Claude Supervisor is
+# advisory-only by design (agents/claude-supervisor.md, and the "Claude
+# Supervisor role" section of the migration plan) — no shell, no file
+# writes, no repo access beyond whatever text was already put in the
+# prompt. VERIFY this exact flag name and tool-name list against
+# `claude --help` on the real host before trusting it: it's accurate as of
+# this writing, but the CLI's flag surface changes across versions, and a
+# wrong or dropped flag here is a safety regression, not just a bug. Confirm
+# it actually holds — e.g. ask it to run `ls` in a test prompt and check the
+# result really was refused — before relying on this in production.
+DISALLOWED_TOOLS = "Bash,Read,Write,Edit,NotebookEdit,WebFetch,WebSearch,Task"
+
+
+def call_claude(prompt):
+    """Call Claude via the Claude Code CLI in one-shot print mode. Requires
+    `claude` to already be authenticated on this host — either an
+    interactive `claude login` as this user, or `claude setup-token` for
+    headless use (see README.md "Manual setup"; verify the exact command
+    against `claude setup-token --help`, it wasn't confirmed from this
+    session).
+
+    Run from an isolated empty scratch directory rather than this script's
+    own directory, so `claude` has no ambient project files (no CLAUDE.md,
+    no repo context) to pick up beyond what's explicitly in the prompt.
+    """
+    with tempfile.TemporaryDirectory(prefix="claude-supervisor-") as scratch:
+        cmd = [
+            CLAUDE_BIN,
+            "-p",
+            prompt,
+            "--model",
+            os.environ.get("CLAUDE_SUPERVISOR_MODEL", "claude-sonnet-5"),
+            "--disallowedTools",
+            DISALLOWED_TOOLS,
+            "--max-turns",
+            "1",
+            "--output-format",
+            "text",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=scratch)
+    if result.returncode != 0:
+        raise RuntimeError(f"claude CLI failed (exit {result.returncode}): {result.stderr.strip()}")
+    return result.stdout.strip()
 
 
 def file_approval_request(company_id, requested_by_agent_id, issue, review_text):

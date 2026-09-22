@@ -9,15 +9,18 @@
 #   cd ~/claude-supervisor-setup && ./install.sh
 #
 # Before running this, by hand (see README.md "Manual setup" — this script
-# does NOT do these; they need board-level Paperclip access):
+# does NOT do these; they need board-level Paperclip access or interactive
+# login):
 #   1. Confirm `paperclipai` CLI is installed and authenticated
 #      (`paperclipai service status`).
 #   2. Create a Paperclip agent identity for claude-supervisor and a scoped
 #      API key for it.
-#   3. Obtain an Anthropic API key.
+#   3. Confirm `claude` (Claude Code CLI) is installed and authenticate it
+#      as this user — `claude login` or `claude setup-token` (verify against
+#      `claude setup-token --help`; not independently confirmed here).
 #
-# This script IS idempotent — re-running it updates the venv/files/service
-# in place without duplicating anything, and never overwrites an existing
+# This script IS idempotent — re-running it updates the files/service in
+# place without duplicating anything, and never overwrites an existing
 # .env.
 
 set -euo pipefail
@@ -34,6 +37,11 @@ fail() { echo -e "${RED}✗ $*${NC}"; }
 
 command -v python3 >/dev/null || { fail "python3 not found"; exit 1; }
 command -v paperclipai >/dev/null || warn "paperclipai CLI not found on PATH — the daemon will fail until it is"
+if command -v claude >/dev/null; then
+  ok "claude CLI found: $(claude --version 2>&1 | head -1)"
+else
+  warn "claude CLI not found on PATH — install it and authenticate before starting the service"
+fi
 
 say "Installing to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
@@ -49,13 +57,8 @@ else
 fi
 chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
 
-if [[ ! -d "$INSTALL_DIR/venv" ]]; then
-  say "creating venv"
-  python3 -m venv "$INSTALL_DIR/venv"
-fi
-"$INSTALL_DIR/venv/bin/pip" install --quiet --upgrade pip
-"$INSTALL_DIR/venv/bin/pip" install --quiet anthropic
-ok "venv ready with anthropic SDK installed"
+# No venv needed — the daemon calls the `claude` CLI as a subprocess and
+# otherwise uses only the Python standard library.
 
 mkdir -p "$SYSTEMD_USER_DIR"
 cp "$SCRIPT_DIR/claude-supervisor.service" "$SYSTEMD_USER_DIR/claude-supervisor.service"
@@ -71,7 +74,8 @@ fi
 echo
 warn "Not starting the service automatically."
 echo "Next steps:"
-echo "  1. Edit $INSTALL_DIR/.env with real ANTHROPIC_API_KEY, PAPERCLIP_API_KEY, CLAUDE_SUPERVISOR_AGENT_ID"
-echo "  2. Run ./verify.sh — dry-runs a single pass, calls nothing external except paperclipai read calls"
-echo "  3. When that looks right: systemctl --user enable --now claude-supervisor"
-echo "  4. Watch it:            journalctl --user -u claude-supervisor -f"
+echo "  1. Authenticate claude (claude login, or claude setup-token for headless) as this user, if not done already"
+echo "  2. Edit $INSTALL_DIR/.env with real PAPERCLIP_API_KEY, CLAUDE_SUPERVISOR_AGENT_ID (and CLAUDE_CODE_OAUTH_TOKEN if using setup-token)"
+echo "  3. Run ./verify.sh — dry-runs a single pass, calls nothing external except paperclipai read calls"
+echo "  4. When that looks right: systemctl --user enable --now claude-supervisor"
+echo "  5. Watch it:            journalctl --user -u claude-supervisor -f"
