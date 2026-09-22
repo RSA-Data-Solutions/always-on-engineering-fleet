@@ -17,6 +17,9 @@ REQUIRED_AGENT_FILES = [
     "agents/lynn.md",
     "agents/sam.md",
     "agents/dhira.md",
+    # Claude Supervisor runs as a standalone daemon, not a hermes_local/gateway
+    # Paperclip agent — see scripts/setup/claude-supervisor/README.md.
+    "agents/claude-supervisor.md",
 ]
 
 REQUIRED_CONTEXT_FILES = [
@@ -62,6 +65,11 @@ AGENT_REQUIRED_SECTIONS = {
     "agents/dhira.md": [
         "## Research process",
         "## Proposal format",
+        "## What not to do",
+    ],
+    "agents/claude-supervisor.md": [
+        "## Inputs",
+        "## Your job",
         "## What not to do",
     ],
 }

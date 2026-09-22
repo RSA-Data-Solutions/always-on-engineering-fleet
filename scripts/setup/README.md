@@ -1,3 +1,13 @@
+# Setup scripts
+
+- **`claude-supervisor/`** — build plan and scripts for the Claude Supervisor
+  advisory role (see `claude-supervisor/README.md`). Run on the Ubuntu host
+  that runs Paperclip/Hermes, not from this Mac.
+- **`phase-1-2-3.sh`** (below) — earlier, unrelated iNova QA-fleet setup
+  (bypass secret, GitHub labels, health endpoints). Predates Paperclip/Hermes.
+
+---
+
 # Phase 1-2-3 setup script
 
 One script that walks through:
