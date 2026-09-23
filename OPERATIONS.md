@@ -142,6 +142,46 @@ not committed to Git (`~/.hermes/` is outside this repo).
 
 ---
 
+## Automatic pipeline handoff
+
+Neither of the two components below was documented here yet as of
+2026-09-22 even though both exist — this section closes that gap. Steps 5-7
+of the workflow above ("Paperclip's own heartbeat scheduler ... invokes that
+agent's `hermes_local` run automatically") describe how **one** agent's
+assigned issue gets worked. They do not describe what happens *after* that
+agent sets a disposition — historically, nothing did, and issues sat at
+`done` indefinitely (confirmed live 2026-09-22: RSA-4, 8, 17, 18, 19, 20 all
+sitting at `done`, assigned to Sam, untouched). Two standalone daemons close
+that gap, both under `scripts/setup/`, both systemd-timer-driven rather than
+`hermes_local`/`hermes_gateway`:
+
+| Daemon | Dir | Watches | Does |
+|---|---|---|---|
+| Claude Supervisor | `scripts/setup/claude-supervisor/` | `in_review` issues, company-wide | Calls Claude (via CLI, advisory only, no tool access) for a second opinion; comments the verdict; files a `request_board_approval` if it isn't a clean `agree` |
+| Pipeline Advancer | `scripts/setup/pipeline-advancer/` | `done`/`blocked`/`in_review` issues with a non-null `parentId` | Reassigns `done` issues to the next role (Sam→Lynn→Aaron→`in_review`), auto-closes on a Claude Supervisor `agree`, and Slack-notifies on every transition and on `blocked` |
+
+Together: Ram creates a parent "epic" issue plus a child issue assigned to
+Sam (see `scripts/setup/pipeline-advancer/README.md` for the exact command —
+`parentId` is the enrollment marker, not a label, since the CLI has no
+label-attach command) → Sam works it and sets `done` → Pipeline Advancer
+reassigns to Lynn, `status=todo` → Lynn tests and sets `done` → reassigned to
+Aaron → Aaron deploys and sets `done` → Pipeline Advancer sets
+`status=in_review` → Claude Supervisor reviews and comments → on `agree`,
+Pipeline Advancer sets `status=done` (closed). A `blocked` at any of the
+Sam/Lynn/Aaron stages, or a non-`agree` verdict, pauses the chain and posts
+to Slack instead of silently sitting there. Only issues explicitly enrolled
+this way (via `parentId`) auto-advance — a flat issue Ram creates directly
+(no parent), such as a one-off investigation, is never touched by Pipeline
+Advancer.
+
+Both daemons write through a board-level "workaround" API key rather than
+their own scoped agent key, because of a confirmed upstream Paperclip bug
+(paperclipai/paperclip#13708) where a heartbeat run's own scoped key 403s on
+issue writes. See either daemon's README for specifics; revert once that
+bug ships a fix.
+
+---
+
 ## Approvals
 
 Two distinct paths, on purpose:

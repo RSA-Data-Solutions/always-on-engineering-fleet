@@ -108,6 +108,11 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
+If this issue has a parent (part of Ram's dev→QA→deploy→review pipeline),
+setting `done` is all you need to do — the Pipeline Advancer daemon
+reassigns it to Aaron for deploy automatically. Setting `blocked` pauses the
+pipeline and Slack-notifies on its own; you don't need to escalate manually.
+
 ---
 
 ## Project-specific notes

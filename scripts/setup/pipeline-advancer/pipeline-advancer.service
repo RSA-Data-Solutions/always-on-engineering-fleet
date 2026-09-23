@@ -1,0 +1,20 @@
+[Unit]
+Description=Pipeline Advancer — trigger one handoff-check heartbeat via Paperclip
+After=network-online.target paperclipai.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Same shape as claude-supervisor.service (sibling directory) and the same
+# reason: Paperclip's own `process` adapter spawns
+# pipeline_advancer.py --once for this run, injecting PAPERCLIP_RUN_ID + a
+# fresh scoped PAPERCLIP_API_KEY per the Pipeline Advancer agent's
+# adapterConfig. Do not run pipeline_advancer.py directly as a long-lived
+# daemon outside of this — the read calls need a live heartbeat run's
+# injected key.
+#
+# Writes (reassign, status change, comment) go through
+# PAPERCLIP_BOARD_KEY_WORKAROUND from ~/.pipeline-advancer/.env instead of
+# the injected key, for the same reason claude_supervisor.py does — confirmed
+# upstream bug paperclipai/paperclip#13708. Revert once that ships.
+ExecStart=/usr/bin/env paperclipai agent heartbeat:invoke __PIPELINE_ADVANCER_AGENT_ID__

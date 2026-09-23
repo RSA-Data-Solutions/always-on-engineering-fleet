@@ -115,6 +115,11 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
+If this issue has a parent (part of Ram's dev→QA→deploy→review pipeline),
+setting `done` is all you need to do — the Pipeline Advancer daemon
+reassigns it to Lynn for QA automatically. You don't need to create a
+follow-up task yourself or ping anyone.
+
 ---
 
 ## IBM i / QSYS2-specific guidance (IBMiMCP project)

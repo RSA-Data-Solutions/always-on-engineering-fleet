@@ -255,6 +255,35 @@ When the context file is `self-improvement.md`, the fleet targets its own agent 
 
 ---
 
+## Enrolling a task in the automatic pipeline (Paperclip live mode)
+
+When a Slack request is "build/fix X and ship it" — the full dev → QA →
+deploy → review → close cycle — don't just create one issue assigned to Sam
+and stop. On its own, nothing hands a `done` issue to the next role; six
+real issues (RSA-4, 8, 17, 18, 19, 20) sat at `done` under Sam with no
+follow-up before this was fixed (2026-09-22). Instead:
+
+1. Create a parent "epic" issue (unassigned, `status=backlog`) for the
+   feature.
+2. Create the actual dev task as its **child** (`--parent-id <epic id>`),
+   assigned to Sam, `status=todo`.
+
+The Pipeline Advancer daemon (`scripts/setup/pipeline-advancer/`) then
+reassigns that child issue through Lynn (QA) and Aaron (devops)
+automatically as each stage reports `done`, sends it to Claude Supervisor
+for review once deployed, and closes it on an `agree` verdict — see
+`OPERATIONS.md`'s "Automatic pipeline handoff" section and that daemon's
+README for the exact commands and full stage map. You'll get a Slack
+message at every transition, including if something gets `blocked`, so you
+don't need to poll `issue list` to find out.
+
+For a flat, one-off task that shouldn't auto-cascade to deploy (an
+investigation, a one-line research question, self-improvement work) — just
+create it directly with no `parentId`, same as always. The pipeline only
+touches issues enrolled this way.
+
+---
+
 ## What not to do
 
 - Do not modify test files to make tests pass artificially
