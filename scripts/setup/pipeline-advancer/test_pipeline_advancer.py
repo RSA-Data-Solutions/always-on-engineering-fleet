@@ -87,17 +87,24 @@ class FakePaperclip:
             return dict(self.issues[args[2]])
         raise AssertionError(f"unexpected CLI call {args}")
 
-    def patch(self, issue_id, status=adv._UNSET, assignee=adv._UNSET, comment=adv._UNSET, description=adv._UNSET):
+    def http_patch(self, issue_id, body):
+        """Paperclip's PATCH, including the validation that bit us in production:
+        blocking requires an unblockDescriptor (422 otherwise)."""
+        if body.get("status") == "blocked" and not body.get("unblockDescriptor"):
+            raise RuntimeError(
+                "PATCH failed: 422 Entering blocked requires unresolved blockers, "
+                "a pending interaction/approval, or unblockDescriptor"
+            )
         issue = self.issues[issue_id]
-        if status is not adv._UNSET:
-            issue["status"] = status
+        if "status" in body:
+            issue["status"] = body["status"]
             issue["statusVersion"] += 1
-        if assignee is not adv._UNSET:
-            issue["assigneeAgentId"] = assignee
-        if description is not adv._UNSET:
-            issue["description"] = description
-        if comment is not adv._UNSET:
-            self.add_comment(issue_id, comment)
+        if "assigneeAgentId" in body:
+            issue["assigneeAgentId"] = body["assigneeAgentId"]
+        if "description" in body:
+            issue["description"] = body["description"]
+        if "comment" in body:
+            self.add_comment(issue_id, body["comment"])
 
     def post_slack(self, text, channel=None, thread_ts=None):
         self.slack.append({"text": text, "channel": channel, "thread_ts": thread_ts})
@@ -117,7 +124,7 @@ class PipelineTest(unittest.TestCase):
         self.state = {k: {} for k in ("advanced", "blocked_notified", "review_acted", "rework", "published")}
         patches = [
             mock.patch.object(adv, "paperclip", self.fp.cli),
-            mock.patch.object(adv, "update_issue", self.fp.patch),
+            mock.patch.object(adv, "http_patch", self.fp.http_patch),
             mock.patch.object(adv, "post_slack", self.fp.post_slack),
             mock.patch.object(adv, "save_state", lambda s: None),
             mock.patch.object(adv, "SLACK_VERBOSE", False),
@@ -290,6 +297,19 @@ class PipelineTest(unittest.TestCase):
         self.advance()
         self.assertEqual(self.bodies(), [])
         self.assertEqual(self.fp.slack, [])
+
+
+class UpdateBodyTest(unittest.TestCase):
+    def test_blocked_always_carries_unblock_descriptor_and_others_do_not(self):
+        sent = []
+        with mock.patch.object(adv, "http_patch", lambda i, b: sent.append(b)):
+            adv.update_issue("x", status="blocked", assignee=None, comment="c")
+            adv.update_issue("x", status="todo", assignee=adv.SAM_ID)
+            adv.update_issue("x", description="d")
+        self.assertEqual(sent[0]["unblockDescriptor"]["owner"], "board")
+        self.assertIsNone(sent[0]["assigneeAgentId"])  # None really is sent, i.e. "clear"
+        self.assertNotIn("unblockDescriptor", sent[1])
+        self.assertEqual(sent[2], {"description": "d"})  # untouched fields are not sent
 
 
 class DiffLookupTest(unittest.TestCase):

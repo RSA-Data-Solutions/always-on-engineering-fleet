@@ -226,18 +226,18 @@ def list_issue_comments(issue_id):
     return sorted(comments, key=lambda c: c.get("createdAt") or "")
 
 
-def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, description=_UNSET):
-    """PATCH /api/issues/{id} with the board workaround key. `assignee=None`
-    clears the assignee (the CLI can't express that)."""
-    body = {}
-    if status is not _UNSET:
-        body["status"] = status
-    if assignee is not _UNSET:
-        body["assigneeAgentId"] = assignee
-    if comment is not _UNSET:
-        body["comment"] = comment
-    if description is not _UNSET:
-        body["description"] = description
+# Paperclip rejects `status=blocked` (422 "Entering blocked requires unresolved
+# blockers, a pending interaction/approval, or unblockDescriptor") unless it is
+# told who unblocks it. Every block this daemon sets is waiting on a human.
+UNBLOCK_DESCRIPTOR = {
+    "owner": "board",
+    "action": "Read the latest pipeline comment and Slack message, then set the issue back to "
+    "backlog (spec/code review) or todo (agent stage) to resume.",
+}
+
+
+def http_patch(issue_id, body):
+    """PATCH /api/issues/{id} with the board workaround key."""
     req = urllib.request.Request(
         f"{API_BASE}/issues/{issue_id}",
         data=json.dumps(body).encode("utf-8"),
@@ -249,6 +249,23 @@ def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, descr
             return json.loads(resp.read() or b"null")
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"PATCH issue {issue_id} failed: {e.code} {e.read().decode()[:300]}")
+
+
+def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, description=_UNSET):
+    """Update an issue. `assignee=None` clears the assignee (the CLI can't
+    express that, hence the HTTP API)."""
+    body = {}
+    if status is not _UNSET:
+        body["status"] = status
+        if status == "blocked":
+            body["unblockDescriptor"] = UNBLOCK_DESCRIPTOR
+    if assignee is not _UNSET:
+        body["assigneeAgentId"] = assignee
+    if comment is not _UNSET:
+        body["comment"] = comment
+    if description is not _UNSET:
+        body["description"] = description
+    return http_patch(issue_id, body)
 
 
 def slack_api(method, token, payload):

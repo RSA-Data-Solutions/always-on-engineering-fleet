@@ -2,12 +2,12 @@
 Description=Pipeline Advancer — periodic handoff-check heartbeat trigger
 
 [Timer]
-# 90s: fast enough that a handoff doesn't sit visibly stuck, slower than
-# Paperclip's own ~30s per-agent heartbeat so it isn't racing every agent's
-# own poll. Tighten only if handoff latency actually matters in practice.
+# 30s, the same cadence as Paperclip's own per-agent heartbeat, so a finished
+# stage is handed to the next agent within ~30s. An idle pass is a few
+# read-only CLI calls.
 OnBootSec=60
-OnUnitActiveSec=90
-AccuracySec=15
+OnUnitActiveSec=30
+AccuracySec=5
 
 [Install]
 WantedBy=timers.target

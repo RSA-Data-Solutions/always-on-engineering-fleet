@@ -391,10 +391,19 @@ STAGE_TAG_RE = re.compile(r"\[pipeline-stage:\s*([a-z-]+)\]", re.IGNORECASE)
 RUN_BUDGET_SECONDS = int(os.environ.get("CLAUDE_SUPERVISOR_RUN_BUDGET", "140"))
 
 PROJECTS_BLURB = (
-    "Projects the fleet works on:\n"
-    "- IBMiMCP: an MCP server exposing IBM i (QSYS2 SQL services) tools; Python; tests via `python3 run_tests.py`.\n"
-    "- iNova: Python/FastAPI orchestrator (orchestrator/app/) + Next.js frontend (frontend/) + Docker Compose.\n"
-    "- fleet: this engineering fleet's own agent instruction files (agents/, contexts/)."
+    "Projects the fleet works on (this is what you know about them — treat it as fact, do not ask about it):\n"
+    "- IBMiMCP: an MCP server exposing IBM i tools (DB2 for i / QSYS2 SQL services, IFS, jobs, objects, source "
+    "members). Python. The IBM i connection layer lives HERE: the connection method is chosen by configuration "
+    "(IBMI_CONNECTION_TYPE = ssh (default), jdbc (JT400), plus REST APIs). Tests: `python3 run_tests.py`. Anything "
+    "about HOW the fleet connects to an IBM i host belongs in IBMiMCP.\n"
+    "- iNova: a Python/FastAPI orchestrator (orchestrator/app/) + Next.js frontend (frontend/) + Docker Compose. It "
+    "includes the 'iNova IDE' (code-server-base/: an OpenVSCode Server container for RPGLE/CL/SQL work). The iNova "
+    "IDE reaches IBM i ONLY through IBMiMCP — it has no connection layer of its own, so a new IBMiMCP connection "
+    "type is picked up by the IDE through IBMiMCP configuration, not by separate IDE code.\n"
+    "- fleet: this engineering fleet's own agent instruction files (agents/, contexts/).\n"
+    "'iNovaIDE' / 'iNova IDE' means the IDE inside the iNova project. When a request names several projects, "
+    "identify which one actually owns the change (usually one), say so, and list the others as follow-ups or "
+    "out of scope rather than asking — the pipeline builds one project per issue."
 )
 
 

@@ -193,10 +193,8 @@ journalctl --user -u pipeline-advancer -f
 - **Tests:** `python3 -m unittest scripts/setup/pipeline-advancer/test_pipeline_advancer.py`
   drives the whole pipeline (happy path, both rework loops, the cap, clarification, Slack
   routing, idempotence) through an in-memory fake Paperclip. No network or Claude needed.
-- **Claude Supervisor now calls Claude for pipeline reviews** — its poll interval is 90s
+- **Claude Supervisor now calls Claude for pipeline reviews** — its poll interval is 30s
   (`claude-supervisor.timer`) and it takes a lock so overlapping runs can't double-post.
-- **90s poll interval** (`pipeline-advancer.timer`) is faster than
-  claude-supervisor's 300s because a stuck handoff is the whole problem
-  being solved here — don't loosen it without a reason, and don't tighten it
-  much further either (Paperclip's own per-agent heartbeat is ~30s; racing
-  much faster than that buys nothing).
+- **30s poll interval** (`pipeline-advancer.timer`) matches Paperclip's own per-agent
+  heartbeat, so a finished stage reaches the next agent within ~30s. Don't tighten it
+  further (racing the agents' own heartbeat buys nothing); loosening it only adds latency.

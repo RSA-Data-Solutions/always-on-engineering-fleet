@@ -2,12 +2,12 @@
 Description=Claude Supervisor — periodic advisory-review heartbeat trigger
 
 [Timer]
-# 90s (was 300): the pipeline's spec and code reviews wait on this poll, and it only
+# 30s (was 300): the pipeline's spec and code reviews wait on this poll, and it only
 # calls Claude when a review is actually due, so an idle pass costs nothing.
 # Overlapping runs are prevented by a lock in claude_supervisor.py.
 OnBootSec=60
-OnUnitActiveSec=90
-AccuracySec=30
+OnUnitActiveSec=30
+AccuracySec=5
 
 [Install]
 WantedBy=timers.target

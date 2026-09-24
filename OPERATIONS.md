@@ -175,8 +175,8 @@ Who does what, and where it lives:
 | Piece | Runs as | Does |
 |---|---|---|
 | Ram | Hermes gateway, persona in `~/.hermes/SOUL.md` | Acknowledges in Slack, files the epic + child. Does **not** assign work to Sam/Lynn/Aaron for pipeline requests. |
-| Claude Supervisor | `claude-supervisor.timer` (90s) → `process` agent → `claude_supervisor.py` | Writes the spec review and code review as comments (Claude via the `claude` CLI, no tools). Also still gives the old `in_review` second opinion. |
-| Pipeline Advancer | `pipeline-advancer.timer` (90s) → `process` agent → `pipeline_advancer.py` | The only router: reads each stage's result and reassigns. Posts the final Slack message as the bot (Ram's identity) and closes. |
+| Claude Supervisor | `claude-supervisor.timer` (30s) → `process` agent → `claude_supervisor.py` | Writes the spec review and code review as comments (Claude via the `claude` CLI, no tools). Also still gives the old `in_review` second opinion. |
+| Pipeline Advancer | `pipeline-advancer.timer` (30s) → `process` agent → `pipeline_advancer.py` | The only router: reads each stage's result and reassigns. Posts the final Slack message as the bot (Ram's identity) and closes. |
 | Sam / Lynn / Aaron | `hermes_local` | Do their stage, set `done`/`blocked`. Never assign the issue onward. |
 
 Full stage map, rework rules, and the design reasons (notably why Claude's stages are
