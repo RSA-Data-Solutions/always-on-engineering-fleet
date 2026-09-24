@@ -103,7 +103,7 @@ not a place to record secrets.
 |---|---|---|
 | `LLAMA_API_KEY` | Anything calling llama-server directly | `/etc/default/llama-qwen` (mode 600, owned by `sashi`) |
 | Paperclip board token | This Claude Code session / CLI admin use | `~/.paperclip/auth.json` |
-| Ram's task-bridge key (`task_bridge`, scoped to the fleet project, can assign to all 4 reports) | Ram's delegation (`create-task`, `comment`, `update-status`) | Ram's Paperclip `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY` and `~/.hermes/.env` (`PAPERCLIP_BRIDGE_API_KEY`, read by the task-bridge script from the environment) |
+| Ram's task-bridge key (`task_bridge`, scoped to the fleet project, can assign to all 4 reports) | Ram's delegation (`create-task`, `comment`, `update-status`), via `~/.hermes/bin/ram-task` | Ram's Paperclip `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY` and `~/.hermes/.env` (`PAPERCLIP_BRIDGE_API_KEY`, read by the task-bridge script from the environment) |
 | Ram's standard key (broad read, cannot approve/reject) | `paperclipai issue list` / `approval create`, via `~/.hermes/bin/ram-paperclipai` | `~/.hermes/.env` (`PAPERCLIP_RAM_STANDARD_KEY`) and Ram's `adapterConfig.env.PAPERCLIP_API_KEY` |
 | Each of Aaron/Dhira/Lynn/Sam's own `task_bridge` key (scoped to themselves only) | Self-reporting disposition (`update-status`, `comment`) on their own assigned issues | Each agent's own `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY` |
 | `API_SERVER_KEY` | Gateway's own HTTP API (port 8642) | `~/.hermes/.env` |
@@ -114,8 +114,13 @@ because the model wasn't reliably expanding `$VAR` when composing commands). Key
 `~/.hermes/.env` (mode 600). To keep the model from ever having to type or expand one, the
 standard key is applied by a wrapper, `~/.hermes/bin/ram-paperclipai`, which reads
 `PAPERCLIP_RAM_STANDARD_KEY` from that file and calls `paperclipai --api-key …`; SOUL.md just
-tells Ram to run every `paperclipai` command through it. The task-bridge script reads
-`PAPERCLIP_BRIDGE_API_KEY` from the environment on its own. To rotate Ram's standard key, mint a
+tells Ram to run every `paperclipai` command through it. Likewise task creation goes through
+`~/.hermes/bin/ram-task`, which loads the four `PAPERCLIP_*` bridge settings from `.env` itself and
+execs `paperclip-task.mjs`. **Ram must not call `paperclip-task.mjs` directly:** on 2026-09-23 he ran
+it inside `execute_code`, whose sandbox has no `PAPERCLIP_BRIDGE_API_KEY`, got "key is required",
+and concluded he "cannot create tasks" — writing a proposal file instead of filing anything. The
+wrapper makes it work from any tool, and SOUL.md now has a "never fake it" section (a task exists
+only if `ram-task` printed its identifier; show errors, don't substitute a document). To rotate Ram's standard key, mint a
 new one, update `.env` (and Ram's `adapterConfig.env.PAPERCLIP_API_KEY`), and revoke the old.
 
 ---
