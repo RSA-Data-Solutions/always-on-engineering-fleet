@@ -115,10 +115,29 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-If this issue has a parent (part of Ram's dev→QA→deploy→review pipeline),
-setting `done` is all you need to do — the Pipeline Advancer daemon
-reassigns it to Lynn for QA automatically. You don't need to create a
-follow-up task yourself or ping anyone.
+### When the issue is part of the pipeline (it has a parent epic)
+
+The pipeline is: Claude enhances the request → **you build** → Claude reviews your
+change against the request → Lynn tests → Aaron deploys → Ram reports in Slack.
+The Pipeline Advancer daemon does every handoff; setting `done` is all you do.
+Never assign the issue to Lynn, Ram, or anyone else yourself, and don't create
+follow-up tasks or ping anyone.
+
+* **Read the whole issue before you start** — the description now ends with an
+  "Enhanced request (Claude spec review)" section (goal, acceptance criteria, scope,
+  out of scope). Those acceptance criteria are what Claude will check your change
+  against. Read the comments too: if this is a rework, the latest comment holds
+  **Claude's rework items** or **Lynn's failing-test findings** — fix exactly those.
+* **Commit your work, with the issue key in the commit message** (for example
+  `RSA-24: add retry to deploy health check`) and quote the commit hash in your
+  final comment. Claude's reviewer finds your change by that key or hash; work that
+  is not committed, or committed without the key, cannot be verified and will come
+  back as "needs a human look". Do not push — that is the CTO's authority.
+* Your final comment should say what changed, which acceptance criteria it meets,
+  and how you verified it — the reviewer compares it against the diff.
+* If the same issue keeps coming back to you and you cannot resolve it, set
+  `blocked` and say what is stopping you instead of looping. (The pipeline also caps
+  rework loops and escalates to a human on its own.)
 
 ---
 

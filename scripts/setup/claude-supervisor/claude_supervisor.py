@@ -24,6 +24,16 @@ agentic coding tool with shell/file-write access by default, tool access is
 explicitly locked to nothing on every call (see DISALLOWED_TOOLS below) —
 that lockdown is load-bearing for the "advisory only" design, not a nicety.
 
+Pipeline reviews (added 2026-09-23): besides the `in_review` second opinion
+above, this script writes the two Claude reviews in the delivery pipeline that
+pipeline_advancer.py drives — a SPEC review (turns Ram's Slack request into an
+enhanced, testable request before Sam starts) and a CODE review (checks Sam's
+change against that request and writes test requests for Lynn). Both are
+advisory comments only: the advancer reads them and does the routing. They
+apply to unassigned `backlog` child issues; the stage is read from the
+`[pipeline-stage: X]` tag the advancer leaves in its own comments (see
+pipeline_advancer.py's docstring for why these issues are unassigned).
+
 See README.md in this directory for the build plan, what is verified vs.
 assumed about the `paperclipai` and `claude` CLI surfaces, and the manual
 setup steps this script depends on (a Paperclip agent identity + API key for
@@ -32,9 +42,11 @@ exist before this will do anything useful).
 """
 import argparse
 import datetime
+import fcntl
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -286,6 +298,14 @@ def parse_verdict(review_text):
     return "needs-human-look"
 
 
+def post_board_comment(issue_id, body):
+    cmd = ["paperclipai", "issue", "comment", issue_id, "--body", body, "--api-key", board_workaround_key(), "--json"]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError(f"issue comment failed: {result.stderr.strip()}")
+    return json.loads(result.stdout)
+
+
 def file_review_comment(issue_id, issue, review_text):
     """Post the review as an issue comment. `approval create --type` turned
     out to be a fixed enum (hire_agent|approve_ceo_strategy|
@@ -357,7 +377,207 @@ def file_board_escalation(company_id, issue_id, issue, review_text):
     return json.loads(result.stdout)
 
 
+# ---------------------------------------------------------------------------
+# Pipeline reviews (spec + code) — see module docstring.
+# ---------------------------------------------------------------------------
+
+SPEC_MARK = "**Claude spec review**"
+CODE_MARK = "**Claude code review**"
+STAGE_TAG_RE = re.compile(r"\[pipeline-stage:\s*([a-z-]+)\]", re.IGNORECASE)
+
+# Each Claude call can take up to 120s and the Paperclip process adapter kills
+# this script at timeoutSec (280): stop starting new reviews after this many
+# seconds so a slow call can't be killed mid-comment.
+RUN_BUDGET_SECONDS = int(os.environ.get("CLAUDE_SUPERVISOR_RUN_BUDGET", "140"))
+
+PROJECTS_BLURB = (
+    "Projects the fleet works on:\n"
+    "- IBMiMCP: an MCP server exposing IBM i (QSYS2 SQL services) tools; Python; tests via `python3 run_tests.py`.\n"
+    "- iNova: Python/FastAPI orchestrator (orchestrator/app/) + Next.js frontend (frontend/) + Docker Compose.\n"
+    "- fleet: this engineering fleet's own agent instruction files (agents/, contexts/)."
+)
+
+
+def sorted_comments(comments):
+    return sorted(comments, key=lambda c: c.get("createdAt") or "")
+
+
+def pipeline_stage(comments):
+    """(stage, index of the comment that set it). Default 'spec': a brand-new
+    child issue has no advancer comment yet."""
+    stage, idx = "spec", -1
+    for i, c in enumerate(comments):
+        m = STAGE_TAG_RE.search(c.get("body") or "")
+        if m:
+            stage, idx = m.group(1).lower(), i
+    return stage, idx
+
+
+def already_reviewed(comments, stage, stage_idx):
+    mark = SPEC_MARK if stage == "spec" else CODE_MARK
+    return any(i > stage_idx and mark in (c.get("body") or "") for i, c in enumerate(comments))
+
+
+def list_pipeline_review_candidates(company_id):
+    """Unassigned backlog children (parentId set) — the pipeline's Claude
+    stages. Unassigned on purpose: assigning to this process agent makes
+    Paperclip auto-block the issue when the run ends without a disposition."""
+    issues = paperclip("issue", "list", "--company-id", company_id, "--status", "backlog")
+    return [
+        i
+        for i in issues
+        if i.get("parentId") and not i.get("assigneeAgentId") and not i.get("assigneeUserId")
+    ]
+
+
+def format_comments(comments):
+    return "\n\n".join(
+        f"[{c.get('authorType', '?')}"
+        f"{':' + c.get('authorAgentId', '') if c.get('authorAgentId') else ''}"
+        f" @ {c.get('createdAt', '?')}]\n{c.get('body', '')}"
+        for c in comments
+    )
+
+
+def build_spec_prompt(issue, comments):
+    return "\n\n".join(
+        [
+            "You are the first reviewer in an autonomous engineering fleet's delivery pipeline. A request "
+            "arrived from Slack via Ram (the CTO agent). Your job is to turn it into an unambiguous, testable "
+            "engineering request for Sam, the engineer. Sam runs on a small local model: he is good at literal, "
+            "narrow, well-specified edits and poor at guessing intent, so be explicit about behaviour, "
+            "boundaries and how success is checked. You have no tools and cannot see the repos — do not invent "
+            "file paths or facts; name likely areas only as clearly-labelled guesses. If the request is too "
+            "vague or contradictory to build safely, answer needs-clarification and ask specific questions "
+            "instead of inventing requirements. But do not stall on details that have a sensible default: pick "
+            "the default (e.g. a modest retry count, exponential backoff) and list it under an 'Assumptions' "
+            "heading inside the enhanced request so a human can see and veto it. Use needs-clarification only "
+            "when a wrong guess would build the wrong thing — an ambiguous target, contradictory requirements, "
+            "or an instruction in the request that says not to proceed.",
+            PROJECTS_BLURB,
+            f"## Request (issue {issue.get('identifier', '')})\n{issue.get('title', '')}\n\n{issue.get('description', '')}",
+            f"## Comments so far\n{format_comments(comments) or '(none)'}",
+            "Respond in this exact structure:\n"
+            "1. VERDICT: ready | needs-clarification\n"
+            "2. PROJECT: IBMiMCP | iNova | fleet | unknown\n"
+            "3. ENHANCED REQUEST:\n"
+            "### Goal\n<one or two sentences>\n"
+            "### Acceptance criteria\n- [ ] <observable, checkable criterion>\n"
+            "### Assumptions\n<defaults you chose where the request was silent, or 'none'>\n"
+            "### Scope\n<what to change, incl. labelled guesses about where>\n"
+            "### Out of scope\n<what must not be touched>\n"
+            "### Test expectations\n<how Lynn (QA) can verify this>\n"
+            "4. QUESTIONS: <numbered questions if needs-clarification, otherwise 'none'>",
+        ]
+    )
+
+
+def build_code_prompt(issue, comments, diff_context):
+    parts = [
+        "You are the code reviewer in an autonomous engineering fleet's delivery pipeline. Sam (engineer, small "
+        "local model) reports the work done; QA (Lynn) and deploy (Aaron) come next. Check the actual change "
+        "against the request below — the acceptance criteria in the 'Enhanced request' section if present. "
+        "The fleet's local model is known to fabricate a 'done' status, so do not approve on Sam's narration "
+        "alone: approve only when the diff evidence shows each criterion addressed and nothing out of scope "
+        "touched. With no diff evidence you cannot verify, so answer needs-human-look. Then write concrete test "
+        "requests for Lynn: specific commands, tool calls or scenarios with the expected result, including at "
+        "least one regression check on adjacent behaviour.",
+        PROJECTS_BLURB,
+        f"## Request (issue {issue.get('identifier', '')})\n{issue.get('title', '')}\n\n{issue.get('description', '')}",
+        f"## History\n{format_comments(comments) or '(none)'}",
+    ]
+    if diff_context:
+        parts.append(f"## Change found in the local repos\n```\n{diff_context}\n```")
+    else:
+        parts.append("## No matching commit found\nNo local commit mentions this issue's key or any commit hash from its comments.")
+    parts.append(
+        "Respond in this exact structure:\n"
+        "1. VERDICT: approve | rework | needs-human-look\n"
+        "2. CONFIDENCE: high | medium | low\n"
+        "3. WHY: 2-4 sentences tied to the diff.\n"
+        "4. REWORK ITEMS: <numbered, concrete fixes — required if rework, otherwise 'none'>\n"
+        "5. TEST REQUESTS: <numbered, concrete checks for Lynn — required if approve>\n"
+        "6. RISK FLAGS: any of {secrets, prohibited-path, scope-creep, untested, none}"
+    )
+    return "\n\n".join(parts)
+
+
+def find_pipeline_diff(issue, comments):
+    """Best-effort change lookup across the local repos and ALL branches:
+    commits whose message mentions the issue key (whole-token match, so RSA-2
+    doesn't match RSA-24), plus any commit hash quoted in the issue's
+    comments. Capped for prompt size. A miss is normal, not an error."""
+    key = issue.get("identifier") or ""
+    hashes = set()
+    for c in comments:
+        hashes.update(re.findall(r"\b[0-9a-f]{7,40}\b", c.get("body") or ""))
+    chunks = []
+    for repo_path in REPO_MAP.values():
+        if not os.path.isdir(os.path.join(repo_path, ".git")):
+            continue
+        try:
+            if key:
+                out = subprocess.run(
+                    ["git", "-C", repo_path, "log", "--all", "-E", f"--grep=(^|[^0-9A-Za-z]){re.escape(key)}([^0-9]|$)",
+                     "--reverse", "-p", "-n", "5"],
+                    capture_output=True, text=True, timeout=20,
+                )
+                if out.returncode == 0 and out.stdout.strip():
+                    chunks.append(f"# repo {repo_path} — commits mentioning {key}\n{out.stdout}")
+            for h in sorted(hashes)[:5]:
+                if subprocess.run(["git", "-C", repo_path, "cat-file", "-e", f"{h}^{{commit}}"],
+                                  capture_output=True, timeout=10).returncode == 0:
+                    shown = subprocess.run(["git", "-C", repo_path, "show", "--stat", "-p", h],
+                                           capture_output=True, text=True, timeout=20)
+                    if shown.returncode == 0 and shown.stdout not in "".join(chunks):
+                        chunks.append(f"# repo {repo_path} — commit {h} quoted in comments\n{shown.stdout}")
+        except Exception:
+            continue
+    return "\n\n".join(chunks)[:30000] or None
+
+
+def file_pipeline_comment(issue_id, mark, review_text):
+    """Post a pipeline review. Any stage tag Claude echoes back is stripped:
+    only the advancer may move an issue between stages."""
+    cleaned = STAGE_TAG_RE.sub("", review_text)
+    return post_board_comment(issue_id, f"{mark}\n\n{cleaned}")
+
+
+def run_pipeline_reviews(args, started):
+    """Write the spec/code review for every unassigned backlog child awaiting
+    one. Stateless: 'awaiting' is derived from the issue's own comments."""
+    done = 0
+    for issue in list_pipeline_review_candidates(args.company_id):
+        if time.monotonic() - started > RUN_BUDGET_SECONDS:
+            print("  run budget spent — leaving the rest for the next pass")
+            break
+        key = issue.get("identifier") or issue.get("id")
+        comments = sorted_comments(list_issue_comments(issue["id"]))
+        stage, stage_idx = pipeline_stage(comments)
+        if stage not in ("spec", "code") or already_reviewed(comments, stage, stage_idx):
+            continue
+        print(f"[{datetime.datetime.now().isoformat()}] pipeline {stage} review for {key}: {issue.get('title', '')}")
+        if args.dry_run:
+            print("  (dry run: skipping Claude call and comment)")
+            continue
+        if stage == "spec":
+            prompt, mark = build_spec_prompt(issue, comments), SPEC_MARK
+        else:
+            prompt, mark = build_code_prompt(issue, comments, find_pipeline_diff(issue, comments)), CODE_MARK
+        try:
+            review_text = call_claude(prompt)
+            file_pipeline_comment(issue["id"], mark, review_text)
+            done += 1
+        except Exception as e:
+            print(f"  error reviewing {key}: {e}", file=sys.stderr)
+    return done
+
+
 def run_once(args, state):
+    started = time.monotonic()
+    pipeline_reviews = run_pipeline_reviews(args, started)
+    if pipeline_reviews:
+        print(f"filed {pipeline_reviews} pipeline review(s)")
     candidates = list_review_candidates(args.company_id)
     reviewed = state["reviewed_issue_updated_at"]
     new_reviews = 0
@@ -367,6 +587,9 @@ def run_once(args, state):
         updated_at = issue.get("updatedAt", "")
         if reviewed.get(key) == updated_at:
             continue  # already reviewed this exact version of the issue
+        if time.monotonic() - started > RUN_BUDGET_SECONDS:
+            print("  run budget spent — leaving the rest for the next pass")
+            break
         print(f"[{datetime.datetime.now().isoformat()}] reviewing {key}: {issue.get('title', '')}")
         if args.dry_run:
             print("  (dry run: skipping Claude call and comment)")
@@ -407,6 +630,17 @@ def main():
 
     if not args.company_id:
         p.error("missing required config: company_id (env PAPERCLIP_COMPANY_ID or --company-id)")
+
+    # One run at a time: Paperclip can wake this agent on demand while the
+    # timer-driven run is still in flight, and two runs would both call Claude
+    # and post duplicate reviews.
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lock = open(STATE_FILE.parent / ".lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        print("another claude_supervisor run holds the lock — exiting")
+        return
 
     state = load_state()
     if args.once:

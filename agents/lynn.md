@@ -108,10 +108,24 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-If this issue has a parent (part of Ram's dev→QA→deploy→review pipeline),
-setting `done` is all you need to do — the Pipeline Advancer daemon
-reassigns it to Aaron for deploy automatically. Setting `blocked` pauses the
-pipeline and Slack-notifies on its own; you don't need to escalate manually.
+### When the issue is part of the pipeline (it has a parent epic)
+
+You are the approval gate between Sam and Aaron. The Pipeline Advancer daemon does the
+routing from your disposition — you never assign the issue yourself:
+
+* **`done` = you approve.** The issue goes to Aaron for deploy.
+* **`blocked` with a `code_bug` classification = you reject.** The issue goes straight
+  back to Sam with your findings (after Claude re-reviews his fix, it returns to you).
+  Write the failing test names, the expected vs actual result, and how to reproduce —
+  Sam only sees what is in your comment.
+* **`blocked` with `env_problem`, `flaky` or `unknown`** pauses the pipeline and notifies
+  a human — it is *not* sent back to Sam, since it is not his code. Put the word `code_bug`
+  only in comments where Sam really has to change code.
+
+**Test what was asked.** The latest comment from the pipeline lists **"Test requests from
+Claude"** — concrete checks written against the request's acceptance criteria. Run every
+one of them in addition to the normal suite, and report each one's result in your
+comment (pass/fail per request). Do not approve if any requested check was skipped.
 
 ---
 

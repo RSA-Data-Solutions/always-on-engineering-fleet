@@ -2,11 +2,11 @@
 Description=Claude Supervisor — periodic advisory-review heartbeat trigger
 
 [Timer]
-# Deliberately slower than Paperclip's own ~30s heartbeat cadence for cost
-# control (see README.md) — keep this interval unless there's a specific
-# reason to tighten it.
+# 90s (was 300): the pipeline's spec and code reviews wait on this poll, and it only
+# calls Claude when a review is actually due, so an idle pass costs nothing.
+# Overlapping runs are prevented by a lock in claude_supervisor.py.
 OnBootSec=60
-OnUnitActiveSec=300
+OnUnitActiveSec=90
 AccuracySec=30
 
 [Install]

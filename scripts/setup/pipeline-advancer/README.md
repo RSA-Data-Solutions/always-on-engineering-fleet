@@ -1,6 +1,6 @@
 # Build plan — Pipeline Advancer
 
-Fixes a confirmed live bug (2026-09-22, verified directly against the running
+Started as a fix for a confirmed live bug (2026-09-22, verified directly against the running
 `sashi-llm` Paperclip instance): when Sam, Lynn, or Aaron finish an issue and
 set a disposition, nothing hands the work to the next role. Six real issues
 (RSA-4, 8, 17, 18, 19, 20) were sitting at `done`, assigned to Sam, with no
@@ -40,59 +40,79 @@ These three were explicit product choices, made 2026-09-22:
    via `chat.postMessage` with `channel=<that user id>` — opens/reuses the
    same DM rather than posting to a separate ops channel.
 
+## The pipeline (revised 2026-09-23)
+
+```
+Slack ─▶ Ram acknowledges, files epic + child (unassigned, backlog)
+          │
+  1 SPEC  │ Claude Supervisor: "**Claude spec review**" (enhanced request)
+          │   ready              → description enriched, assigned to Sam (todo)
+          │   needs-clarification → blocked, Slack question   (human answers, sets backlog → re-review)
+  2 DEV   │ Sam works, sets done
+          │   done               → unassigned + backlog, stage=code
+  3 REVIEW│ Claude Supervisor: "**Claude code review**" against the request + the diff
+          │   approve            → assigned to Lynn (todo) with Claude's TEST REQUESTS
+          │   rework             → back to Sam (todo) with REWORK ITEMS      (counts as a rework)
+          │   needs-human-look   → blocked, Slack-notify (e.g. no diff found)
+  4 QA    │ Lynn tests, sets done or blocked
+          │   done               → Aaron (todo)                              (= Lynn approves)
+          │   blocked + code_bug → back to Sam (todo) with her findings      (counts as a rework)
+          │   blocked otherwise  → paused, Slack-notify
+  5 DEPLOY│ Aaron deploys, sets done
+          │   done               → result posted to Slack in Ram's name (origin thread
+          ▼                        if recorded, else the DM); issue + epic closed
+```
+
+Rework loops (Claude `rework` and Lynn `code_bug`) share one counter per issue,
+capped at `PIPELINE_MAX_REWORK` (default 2); past that the issue is blocked and a
+human is notified. After any rework Sam's fix goes back through the Claude code
+review before Lynn sees it again.
+
+Every transition also leaves a comment on the issue (the board's audit trail). Slack
+only hears about things a human needs to act on, plus the final result;
+`PIPELINE_SLACK_VERBOSE=1` adds every handoff.
+
+**The stage lives in the issue itself.** The advancer's comments carry a
+`[pipeline-stage: spec|dev|code|qa|deploy]` tag; Claude Supervisor reads the latest tag
+to know which review to write and treats a review as done once its comment appears after
+that tag. There is no separate stage field (the CLI can't set one) and Claude Supervisor
+keeps no state for this.
+
+### Why Claude's stages are "unassigned + backlog"
+
+An obvious design assigns the issue to the Claude Supervisor agent while Claude works.
+That fails: verified live 2026-09-23, assigning to a `process`-adapter agent wakes it, and
+when the run ends without setting a disposition Paperclip auto-blocks the issue ("needs a
+disposition… a board decision is required"). Claude Supervisor is advisory and never sets
+a status, so every issue would block at step 1. An unassigned `backlog` issue wakes
+nobody. The advancer therefore also writes over the HTTP API rather than the CLI, because
+`paperclipai issue update` cannot clear an assignee.
+
 ## Enrollment: parentId, not a label
 
-Paperclip's CLI has `issue label:list/create/delete` but **no command to
-attach a label to an issue** (confirmed against `paperclipai issue --help`
-directly, 2026-09-22) — so a label-based convention isn't actually buildable
-from the CLI today. `parentId` already exists on every issue for exactly
-this kind of grouping, so that's the enrollment marker instead:
+Paperclip's CLI can't attach a label to an issue, so `parentId` is the enrollment marker
+(only issues with a parent are touched; flat issues are ignored). For a Slack request Ram
+files two issues — the epic (records the request and where it came from) and the child
+(the work item that flows through the stages; it is reassigned in place, never cloned).
+Both **unassigned, status backlog**; the child's `--parent-id` is the epic's UUID. Ram
+does this with the task-bridge skill (verified working with his scoped key):
 
-1. Ram creates a parent "epic" issue for the feature — unassigned,
-   `status=backlog`, no special fields:
-   ```bash
-   paperclipai issue create --company-id 0c265070-3974-497a-99ee-cf942ffe139d \
-     --title "Feature: <name>" --status backlog --api-key <Ram's task_bridge key> --json
-   ```
-2. Ram creates the actual dev task as its **child**, assigned to Sam:
-   ```bash
-   paperclipai issue create --company-id 0c265070-3974-497a-99ee-cf942ffe139d \
-     --title "<dev task title>" --parent-id <epic issue id> \
-     --assignee-agent-id ba0e2a1d-45ad-4cfd-8c57-91927e5b4ab0 --status todo \
-     --api-key <Ram's task_bridge key> --json
-   ```
-   (`paperclip-task.mjs create-task` doesn't expose `--parent-id` today —
-   use the raw `paperclipai issue create` CLI for enrolled work until that's
-   added, same as this bullet shows.)
-
-The child issue is the one that flows through the pipeline — Sam, Lynn, and
-Aaron all work the *same issue*, reassigned in place; no new issues are
-spawned per stage. Only the initial epic-plus-child creation is manual (by
-Ram); everything after that is this daemon.
-
-## Stage map
-
-```
-Sam done     -> reassign Lynn,  status=todo         ("dev complete, handing off to QA")
-Lynn done    -> reassign Aaron, status=todo         ("QA passed, handing off to devops")
-Lynn/Aaron/
-Sam blocked  -> no reassignment; Slack-notify once, pipeline pauses for a human
-Aaron done   -> status=in_review                    (claude-supervisor's existing
-                                                      company-wide poller picks it up
-                                                      on its own timer — no new wiring)
-in_review +
-Claude Supervisor
-comment posted:
-  verdict agree              -> status=done (closed)
-  verdict disagree/needs-look -> Slack-notify only (claude_supervisor.py already
-                                  filed the board approval; this daemon doesn't
-                                  duplicate that)
+```bash
+cd ~/.hermes/skills/paperclip-task-bridge
+node ./paperclip-task.mjs create-task --project-id b9bb008e-7771-4bc7-aad8-71e2faa3307f \
+  --unassigned --status backlog --title "Feature: <name>" \
+  --description "SLACK_ORIGIN: thread_ts=<id> -- Request: <verbatim>"
+node ./paperclip-task.mjs create-task --project-id b9bb008e-7771-4bc7-aad8-71e2faa3307f \
+  --parent-id <epic uuid> --unassigned --status backlog \
+  --title "<short title>" --description "<structured request>"
 ```
 
-Every transition also gets a comment on the issue itself (visible on the
-Paperclip board) and a Slack message to Ram's conversation, so the same
-event is visible in both places — this is the "communicated to board and
-Slack at each stage" part of the original ask.
+`SLACK_ORIGIN:` (on the epic) is where the final result is posted: `thread_ts=<ts>`
+threads it into the DM the request came from (the DM channel is resolved with
+`conversations.open`); `channel=<id>` targets a specific channel; `SLACK_ORIGIN: none`
+or nothing means an un-threaded DM to `PIPELINE_SLACK_USER_ID`. Ram is told to do all of
+this by a section in `~/.hermes/SOUL.md` (see OPERATIONS.md — `SOUL.md` is outside this
+repo, so the wording is reproduced there).
 
 ## Manual setup (you do this — needs board-level Paperclip access)
 
@@ -164,11 +184,17 @@ journalctl --user -u pipeline-advancer -f
 - **Single shared Paperclip project**, like claude-supervisor — this daemon
   watches `done`/`in_review`/`blocked` issues across the whole company, not
   scoped to one project, since the fleet only runs one today.
-- **Sam/Lynn/Aaron's own agent instructions are unchanged.** They already
-  just set `done`/`blocked`/`in_review` on their own issue and stop — this
-  daemon does the rest externally. No behavioral change needed on their
-  side, only documentation (see `OPERATIONS.md` and the "Reporting back to
-  Paperclip" sections in `agents/*.md`).
+- **Agent instructions carry the pipeline contract.** `agents/sam.md` (commit with the
+  issue key, read the enhanced request and rework items), `agents/lynn.md` (`done` = approve,
+  run Claude's test requests, `code_bug` = send back) and `agents/aaron.md` (self-explanatory
+  final comment, Ram publishes it) were updated with this design; push them with
+  `instructions-file:put` (see OPERATIONS.md — never overwrite Aaron's live file wholesale, it
+  holds a real key the repo copy doesn't).
+- **Tests:** `python3 -m unittest scripts/setup/pipeline-advancer/test_pipeline_advancer.py`
+  drives the whole pipeline (happy path, both rework loops, the cap, clarification, Slack
+  routing, idempotence) through an in-memory fake Paperclip. No network or Claude needed.
+- **Claude Supervisor now calls Claude for pipeline reviews** — its poll interval is 90s
+  (`claude-supervisor.timer`) and it takes a lock so overlapping runs can't double-post.
 - **90s poll interval** (`pipeline-advancer.timer`) is faster than
   claude-supervisor's 300s because a stuck handoff is the whole problem
   being solved here — don't loosen it without a reason, and don't tighten it

@@ -211,10 +211,12 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-If this issue has a parent (part of Ram's dev→QA→deploy→review pipeline),
-setting `done` is all you need to do — the Pipeline Advancer daemon moves it
-to `in_review` for Claude Supervisor automatically, and closes it once that
-review comes back clean. You don't need to notify Ram yourself.
+If this issue has a parent (part of the request→Claude→Sam→Claude→Lynn→Aaron pipeline),
+setting `done` is all you need to do — the Pipeline Advancer daemon then has Ram publish
+the result to Slack (quoting your final comment) and close the issue. You don't need to
+notify Ram or post to Slack yourself, so make your final comment self-explanatory to
+someone who did not follow the work: what was deployed, where, and the health-check /
+smoke-test result. Set `blocked` if the deploy did not come up healthy.
 
 ---
 

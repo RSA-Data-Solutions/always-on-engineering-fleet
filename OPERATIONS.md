@@ -103,16 +103,20 @@ not a place to record secrets.
 |---|---|---|
 | `LLAMA_API_KEY` | Anything calling llama-server directly | `/etc/default/llama-qwen` (mode 600, owned by `sashi`) |
 | Paperclip board token | This Claude Code session / CLI admin use | `~/.paperclip/auth.json` |
-| Ram's task-bridge key (`task_bridge`, scoped to the fleet project, can assign to all 4 reports) | Ram's delegation (`create-task`, `comment`, `update-status`) | Ram's Paperclip `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY`, and literally inlined in `~/.hermes/SOUL.md` |
-| Ram's standard key (broad read, cannot approve/reject) | `paperclipai issue list` for real status checks | Ram's `adapterConfig.env.PAPERCLIP_API_KEY`, inlined in `~/.hermes/SOUL.md` |
+| Ram's task-bridge key (`task_bridge`, scoped to the fleet project, can assign to all 4 reports) | Ram's delegation (`create-task`, `comment`, `update-status`) | Ram's Paperclip `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY` and `~/.hermes/.env` (`PAPERCLIP_BRIDGE_API_KEY`, read by the task-bridge script from the environment) |
+| Ram's standard key (broad read, cannot approve/reject) | `paperclipai issue list` / `approval create`, via `~/.hermes/bin/ram-paperclipai` | `~/.hermes/.env` (`PAPERCLIP_RAM_STANDARD_KEY`) and Ram's `adapterConfig.env.PAPERCLIP_API_KEY` |
 | Each of Aaron/Dhira/Lynn/Sam's own `task_bridge` key (scoped to themselves only) | Self-reporting disposition (`update-status`, `comment`) on their own assigned issues | Each agent's own `adapterConfig.env.PAPERCLIP_BRIDGE_API_KEY` |
 | `API_SERVER_KEY` | Gateway's own HTTP API (port 8642) | `~/.hermes/.env` |
 | Slack `SLACK_BOT_TOKEN` / `SLACK_APP_TOKEN` | Gateway's Slack connection | `~/.hermes/.env` |
 
-Ram's SOUL.md contains inlined literal key values rather than shell-variable references
-on purpose — the model was not reliably expanding `$VAR` references when constructing
-terminal commands. This is a real trade-off: SOUL.md is more sensitive as a result. It is
-not committed to Git (`~/.hermes/` is outside this repo).
+**No secret belongs in `~/.hermes/SOUL.md`** (2026-09-23; it used to inline Ram's standard key
+because the model wasn't reliably expanding `$VAR` when composing commands). Keys now live in
+`~/.hermes/.env` (mode 600). To keep the model from ever having to type or expand one, the
+standard key is applied by a wrapper, `~/.hermes/bin/ram-paperclipai`, which reads
+`PAPERCLIP_RAM_STANDARD_KEY` from that file and calls `paperclipai --api-key …`; SOUL.md just
+tells Ram to run every `paperclipai` command through it. The task-bridge script reads
+`PAPERCLIP_BRIDGE_API_KEY` from the environment on its own. To rotate Ram's standard key, mint a
+new one, update `.env` (and Ram's `adapterConfig.env.PAPERCLIP_API_KEY`), and revoke the old.
 
 ---
 
@@ -138,49 +142,77 @@ not committed to Git (`~/.hermes/` is outside this repo).
    actually succeeded. This is enforced by Paperclip, not a courtesy — see "Reporting back
    to Paperclip" in each `agents/*.md` file.
 8. Ram reports back to the human in Slack. **Take Ram's own narration with skepticism** —
-   see Known limitations below.
+   see Known limitations below. (For build/fix/change requests, steps 4-8 are replaced by the
+   delivery pipeline below: Ram files the request, the Advancer routes it, and the final result
+   is posted by the Advancer in Ram's name.)
 
 ---
 
-## Automatic pipeline handoff
+## Delivery pipeline (Slack request → deployed → reported back)
 
-Neither of the two components below was documented here yet as of
-2026-09-22 even though both exist — this section closes that gap. Steps 5-7
-of the workflow above ("Paperclip's own heartbeat scheduler ... invokes that
-agent's `hermes_local` run automatically") describe how **one** agent's
-assigned issue gets worked. They do not describe what happens *after* that
-agent sets a disposition — historically, nothing did, and issues sat at
-`done` indefinitely (confirmed live 2026-09-22: RSA-4, 8, 17, 18, 19, 20 all
-sitting at `done`, assigned to Sam, untouched). Two standalone daemons close
-that gap, both under `scripts/setup/`, both systemd-timer-driven rather than
-`hermes_local`/`hermes_gateway`:
+This is the as-built flow for any *build / fix / change* request. (Status questions use
+`paperclipai issue list`; research goes to Dhira directly — neither uses the pipeline.)
 
-| Daemon | Dir | Watches | Does |
-|---|---|---|---|
-| Claude Supervisor | `scripts/setup/claude-supervisor/` | `in_review` issues, company-wide | Calls Claude (via CLI, advisory only, no tool access) for a second opinion; comments the verdict; files a `request_board_approval` if it isn't a clean `agree` |
-| Pipeline Advancer | `scripts/setup/pipeline-advancer/` | `done`/`blocked`/`in_review` issues with a non-null `parentId` | Reassigns `done` issues to the next role (Sam→Lynn→Aaron→`in_review`), auto-closes on a Claude Supervisor `agree`, and Slack-notifies on every transition and on `blocked` |
+```text
+Slack → Ram (acknowledges; files epic + child, unassigned/backlog)
+      → Claude spec review     enhances the request (needs-clarification → asks you in Slack)
+      → Sam                    builds; commits with the issue key
+      → Claude code review     checks the diff against the request, writes test requests
+                               (rework → back to Sam)
+      → Lynn                   runs the suite + Claude's test requests
+                               (done = approve; code_bug → back to Sam)
+      → Aaron                  deploys
+      → Ram                    posts the result in the origin Slack thread, closes the task
+```
 
-Together: Ram creates a parent "epic" issue plus a child issue assigned to
-Sam (see `scripts/setup/pipeline-advancer/README.md` for the exact command —
-`parentId` is the enrollment marker, not a label, since the CLI has no
-label-attach command) → Sam works it and sets `done` → Pipeline Advancer
-reassigns to Lynn, `status=todo` → Lynn tests and sets `done` → reassigned to
-Aaron → Aaron deploys and sets `done` → Pipeline Advancer sets
-`status=in_review` → Claude Supervisor reviews and comments → on `agree`,
-Pipeline Advancer sets `status=done` (closed). A `blocked` at any of the
-Sam/Lynn/Aaron stages, or a non-`agree` verdict, pauses the chain and posts
-to Slack instead of silently sitting there. Only issues explicitly enrolled
-this way (via `parentId`) auto-advance — a flat issue Ram creates directly
-(no parent), such as a one-off investigation, is never touched by Pipeline
-Advancer.
+Who does what, and where it lives:
 
-Both daemons write through a board-level "workaround" API key rather than
-their own scoped agent key, because of a confirmed upstream Paperclip bug
-(paperclipai/paperclip#13708) where a heartbeat run's own scoped key 403s on
-issue writes. See either daemon's README for specifics; revert once that
-bug ships a fix.
+| Piece | Runs as | Does |
+|---|---|---|
+| Ram | Hermes gateway, persona in `~/.hermes/SOUL.md` | Acknowledges in Slack, files the epic + child. Does **not** assign work to Sam/Lynn/Aaron for pipeline requests. |
+| Claude Supervisor | `claude-supervisor.timer` (90s) → `process` agent → `claude_supervisor.py` | Writes the spec review and code review as comments (Claude via the `claude` CLI, no tools). Also still gives the old `in_review` second opinion. |
+| Pipeline Advancer | `pipeline-advancer.timer` (90s) → `process` agent → `pipeline_advancer.py` | The only router: reads each stage's result and reassigns. Posts the final Slack message as the bot (Ram's identity) and closes. |
+| Sam / Lynn / Aaron | `hermes_local` | Do their stage, set `done`/`blocked`. Never assign the issue onward. |
 
----
+Full stage map, rework rules, and the design reasons (notably why Claude's stages are
+unassigned `backlog` issues, not assigned to Claude Supervisor) are in
+`scripts/setup/pipeline-advancer/README.md`. Test it offline with
+`python3 -m unittest scripts/setup/pipeline-advancer/test_pipeline_advancer.py`.
+
+Things worth knowing:
+
+- **Only enrolled issues (those with a `parentId`) are pipeline-routed.** A flat issue is never touched.
+- **Human-in-the-loop points:** Claude asks for clarification (issue blocked, question DMed);
+  Claude can't verify the diff; Lynn blocks for a non-code reason; rework exceeds
+  `PIPELINE_MAX_REWORK` (2). Each blocks the issue and DMs you. To resume, fix the cause and set
+  the issue back to `backlog` (spec/code review) or `todo` (agent stage).
+- **Slack is deliberately quiet:** only those human-needed events and the final result. Set
+  `PIPELINE_SLACK_VERBOSE=1` in `~/.pipeline-advancer/.env` for a message per handoff.
+- **The final message goes to the thread recorded in the epic's `SLACK_ORIGIN:`**, else your DM.
+- **Old issues are not migrated.** RSA-4/8/17–20 predate this and are flat, so they stay put.
+- **Claude only sees what's committed.** Sam commits with the issue key (in his instructions);
+  the code review finds the diff via `git log --all` on the key or a hash quoted in comments, and
+  answers `needs-human-look` if it finds none.
+- Both daemons write with a board-level workaround key over the HTTP API because of upstream
+  bug paperclipai/paperclip#13708; revert when it ships. See each daemon's README.
+
+### Ram's SOUL.md section (lives outside the repo)
+
+`~/.hermes/SOUL.md` is not in git, so the pipeline-intake section is summarised here: Ram
+must (1) acknowledge immediately, (2) write the request down (goal, project, done-criteria,
+the person's own words, no invented details; ask one question if too vague), (3) file the
+epic, (4) file the child under it — both `--unassigned --status backlog` via the task-bridge
+skill, epic description starting `SLACK_ORIGIN: thread_ts=<id> -- Request: …`, (5) report
+the real issue numbers, then stop. After editing SOUL.md run `hermes gateway restart`.
+
+### Pushing instruction changes to live agents
+
+The repo file is the source of truth, but two cautions learned 2026-09-23:
+- **Aaron:** the live bundle contains a real `ADMIN_API_KEY` that the repo copy deliberately
+  omits (commit d1e0e04). Do not `instructions-file:put` `agents/aaron.md` wholesale — patch
+  just the changed section in the live file, or the health-check auth breaks.
+- **Sam:** a UI edit had added a "Step 6 — hand off to QA / assign to Lynn" that conflicts with
+  the advancer. The repo file has no such step; pushing it removes the conflict.
 
 ## Approvals
 

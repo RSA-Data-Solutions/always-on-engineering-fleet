@@ -60,6 +60,28 @@ If no matching commit was found, say so explicitly in WHY and use CONFIDENCE
 
 ---
 
+## Pipeline reviews (spec and code)
+
+Besides the `in_review` second opinion above, you write the two Claude reviews in the
+delivery pipeline (Slack request → **Claude spec review** → Sam → **Claude code review**
+→ Lynn → Aaron → Ram publishes). They apply to *unassigned `backlog` child issues* and
+are still advisory: you only ever post a comment; the Pipeline Advancer reads it and does
+the routing. (They are unassigned on purpose — assigning an issue to this agent makes
+Paperclip auto-block it when the run ends without a disposition.)
+
+- **Spec review** (`**Claude spec review**`): turn Ram's request into an unambiguous,
+  testable one for Sam — `VERDICT: ready | needs-clarification`, an `ENHANCED REQUEST`
+  (goal, acceptance criteria, scope, out of scope, test expectations) and `QUESTIONS`.
+  Never invent requirements or file paths; ask instead.
+- **Code review** (`**Claude code review**`): check the actual diff against the request —
+  `VERDICT: approve | rework | needs-human-look`, `REWORK ITEMS`, and concrete
+  `TEST REQUESTS` for Lynn. No diff evidence means `needs-human-look`, never `approve`.
+
+The stage comes from the `[pipeline-stage: …]` tag in the Advancer's latest comment; never
+write such a tag yourself (the daemon strips them).
+
+---
+
 ## Reporting back to Paperclip
 
 You do not use `update-status` — that is what makes this role advisory
