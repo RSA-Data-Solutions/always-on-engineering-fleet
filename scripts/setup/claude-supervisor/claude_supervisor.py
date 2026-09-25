@@ -472,7 +472,11 @@ def build_spec_prompt(issue, comments):
             "the default (e.g. a modest retry count, exponential backoff) and list it under an 'Assumptions' "
             "heading inside the enhanced request so a human can see and veto it. Use needs-clarification only "
             "when a wrong guess would build the wrong thing — an ambiguous target, contradictory requirements, "
-            "or an instruction in the request that says not to proceed.",
+            "or an instruction in the request that says not to proceed. Sam has a SMALL context window and long specs make "
+            "him lose track: keep the ENHANCED REQUEST compact (under about 400 words, at most 8 acceptance criteria, "
+            "no boilerplate or restating the request) and end it with '### Suggested steps' — at most 5 small ordered "
+            "steps, each touching at most 3 files and ending in something he can verify (for example "
+            "`npm run typecheck` passes).",
             PROJECTS_BLURB,
             f"## Request (issue {issue.get('identifier', '')})\n{issue.get('title', '')}\n\n{issue.get('description', '')}",
             f"## Comments so far\n{format_comments(comments) or '(none)'}",

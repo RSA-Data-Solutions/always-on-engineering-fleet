@@ -78,12 +78,30 @@ class DependencyStepTest(GateFixture):
         with mock.patch.dict(os.environ, {"PIPELINE_GATE_X": self.steps}):
             return gate.run_gate("x", self.wt)
 
-    def test_unchanged_dependencies_skip_npm_entirely_and_keep_the_shared_node_modules(self):
+    def test_unchanged_dependencies_skip_npm_entirely(self):
         self.commit("src.ts", "export {}")
         r = self.gate()
         self.assertTrue(r["ok"])
         self.assertEqual(self.npm_calls(), [])
-        self.assertTrue(os.path.islink(os.path.join(self.wt, "node_modules")))
+        self.assertTrue(os.path.isdir(os.path.join(self.wt, "node_modules")))
+
+    def test_a_missing_node_modules_is_restored_instead_of_failing_the_typecheck_with_tsc_not_found(self):
+        """RSA-39: an agent ran `rm -rf node_modules`; the gate then failed with 'tsc not found'."""
+        import shutil
+        shutil.rmtree(os.path.join(self.wt, "node_modules"))
+        r = self.gate()
+        self.assertTrue(r["ok"])
+        self.assertEqual(len(self.npm_calls()), 1)
+        self.assertIn("reinstalled", r["summary"])
+
+    def test_a_legacy_symlinked_node_modules_is_never_installed_through(self):
+        import shutil
+        shutil.rmtree(os.path.join(self.wt, "node_modules"))
+        os.symlink(self.repo / "node_modules", os.path.join(self.wt, "node_modules"))
+        self.commit("package.json", json.dumps({"name": "x", "dependencies": {"new": "^1.0.0"}}))
+        self.gate()
+        self.assertFalse(os.path.islink(os.path.join(self.wt, "node_modules")))
+        self.assertEqual((self.repo / "node_modules" / "shared.txt").read_text(), "operator's node_modules")
 
     def test_a_dependency_that_does_not_exist_fails_the_gate_with_npms_own_message(self):
         """The production case: `mapepire` is not on npm."""

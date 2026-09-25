@@ -55,12 +55,26 @@ class WorktreeTest(GitFixture):
         self.assertFalse((pathlib.Path(wt["path"]) / "wip.txt").exists())  # operator's dirt did not leak in
         self.assertEqual(run("rev-parse", "--abbrev-ref", "HEAD", cwd=self.repo), "some-stale-feature-branch")  # untouched
 
-    def test_idempotent_and_node_modules_is_shared(self):
-        (self.repo / "node_modules").mkdir()
+    def test_idempotent(self):
         a = pg.create_worktree(self.repo, "RSA-31")
         b = pg.create_worktree(self.repo, "RSA-31")
         self.assertEqual(a["path"], b["path"])
-        self.assertTrue(os.path.islink(os.path.join(a["path"], "node_modules")))
+
+    def test_node_modules_is_an_independent_copy_so_agents_cannot_damage_the_operators_install(self):
+        nm = self.repo / "node_modules"
+        (nm / ".bin").mkdir(parents=True)
+        (nm / "pkg").mkdir()
+        (nm / "pkg" / "index.js").write_text("original")
+        os.symlink("../pkg/index.js", nm / ".bin" / "tool")  # relative bin link, as npm creates
+        wt = pathlib.Path(pg.create_worktree(self.repo, "RSA-32")["path"]) / "node_modules"
+        self.assertTrue(wt.is_dir() and not wt.is_symlink())
+        self.assertEqual((wt / "pkg" / "index.js").read_text(), "original")
+        self.assertEqual(os.readlink(wt / ".bin" / "tool"), "../pkg/index.js")  # links preserved
+        # what a careless agent might do inside its worktree:
+        (wt / "pkg" / "index.js").write_text("MODIFIED BY AGENT")
+        subprocess.run("rm -rf node_modules/pkg node_modules/.bin", shell=True, cwd=wt.parent)
+        self.assertEqual((nm / "pkg" / "index.js").read_text(), "original")  # operator's install untouched
+        self.assertTrue((nm / ".bin" / "tool").is_symlink())
 
 
 class CommitTest(GitFixture):
@@ -77,6 +91,19 @@ class CommitTest(GitFixture):
         files = run("show", "--name-only", "--format=", "HEAD", cwd=wt).split()
         self.assertEqual(sorted(files), ["app.txt", "src/mapepire.ts"])
         self.assertEqual(run("log", "-1", "--format=%s", cwd=wt), "RSA-32: Add mapepire")
+
+    def test_a_real_ignored_node_modules_directory_does_not_break_the_commit(self):
+        """After the build gate's own `npm install`, node_modules is a real dir ignored by .gitignore."""
+        wt = pg.create_worktree(self.repo, "RSA-35")["path"]
+        nm = pathlib.Path(wt) / "node_modules"
+        if nm.is_symlink():
+            nm.unlink()
+        nm.mkdir()
+        (nm / "pkg.js").write_text("x")
+        (pathlib.Path(wt) / "app.txt").write_text("line1\nreal change\n")
+        sha = pg.commit_worktree(wt, "RSA-35", "real change")
+        self.assertTrue(sha)
+        self.assertEqual(run("show", "--name-only", "--format=", "HEAD", cwd=wt).split(), ["app.txt"])
 
     def test_nothing_to_commit_returns_none(self):
         wt = pg.create_worktree(self.repo, "RSA-33")["path"]

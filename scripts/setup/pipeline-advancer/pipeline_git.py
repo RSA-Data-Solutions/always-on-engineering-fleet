@@ -106,7 +106,11 @@ def create_worktree(repo, key):
         _must(git("worktree", "add", "-b", branch, str(path), base, cwd=repo), "git worktree add")
     nm = pathlib.Path(repo) / "node_modules"
     if nm.is_dir() and not (path / "node_modules").exists():
-        os.symlink(nm, path / "node_modules")  # so builds/tests run without a reinstall
+        # An independent COPY (140 MB in ~0.15 s), never a symlink: through a symlink an agent's
+        # `npm install` or `rm -rf node_modules/*` would modify or wipe the operator's real install.
+        r = subprocess.run(["cp", "-a", "--reflink=auto", str(nm), str(path / "node_modules")], capture_output=True, text=True)
+        if r.returncode != 0:
+            shutil.copytree(nm, path / "node_modules", symlinks=True, dirs_exist_ok=True)
     return {"path": str(path), "branch": branch, "base": base}
 
 
@@ -116,7 +120,11 @@ def commit_worktree(path, key, title):
     Returns the new commit sha, or None if there was nothing to commit."""
     untracked = git("ls-files", "--others", "--exclude-standard", cwd=path).stdout.splitlines()
     junk = [f for f in untracked if "/" not in f and JUNK_RE.match(f)]
-    spec = [".", ":(exclude)node_modules", *[f":(exclude){f}" for f in junk]]
+    # node_modules needs an explicit exclude only when it is OUR symlink to the shared install (a symlink
+    # is not matched by .gitignore's `node_modules/`). A real directory (after the gate's own npm install)
+    # is already ignored, and naming an ignored path in the pathspec makes `git add` fail.
+    nm_symlink = os.path.islink(os.path.join(str(path), "node_modules"))
+    spec = [".", *([":(exclude)node_modules"] if nm_symlink else []), *[f":(exclude){f}" for f in junk]]
     _must(git("add", "-A", "--", *spec, cwd=path), "git add")
     if git("diff", "--cached", "--quiet", cwd=path).returncode == 0:
         return None

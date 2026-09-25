@@ -56,14 +56,20 @@ def _tail(text, n=1500):
 
 
 def _deps_step(step, wt):
+    nm = pathlib.Path(wt) / "node_modules"
+    if not nm.exists() and (pathlib.Path(wt) / "package.json").exists():
+        # An agent deleted it (or the copy failed): restore it so typecheck/tests can run at all.
+        rc, out = _sh("npm install --ignore-scripts --no-audit --no-fund", wt, step.get("timeout", 600))
+        if rc != 0:
+            return False, "node_modules was missing and `npm install` failed:\n" + _tail(out)
+        return True, "node_modules was missing; reinstalled"
     base = pg.base_ref(wt, fetch=False)
     changed = pg.git("diff", "--name-only", f"{base}...HEAD", "--", "package.json", "package-lock.json", cwd=wt).stdout.split()
     changed += pg.git("status", "--porcelain", "--", "package.json", "package-lock.json", cwd=wt).stdout.split()
     if not changed:
         return True, "dependencies unchanged"
-    nm = pathlib.Path(wt) / "node_modules"
     if nm.is_symlink():
-        nm.unlink()  # the shared node_modules is the operator's: install into our own
+        nm.unlink()  # legacy worktrees only: never install through a link into the operator's node_modules
     rc, out = _sh("npm install --ignore-scripts --no-audit --no-fund", wt, step.get("timeout", 600))
     if rc != 0:
         return False, "npm install failed (a dependency does not exist or cannot be resolved):\n" + _tail(out)

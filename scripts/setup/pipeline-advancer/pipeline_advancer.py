@@ -125,6 +125,16 @@ STALL_MINUTES = int(cfg("PIPELINE_STALL_MINUTES", "20"))
 MAX_CHECKS = int(cfg("PIPELINE_MAX_CHECKS", "3"))
 # After Lynn approves, merge into main and push (the operator's CI/CD deploys from main).
 MERGE_PUSH = _truthy(cfg("PIPELINE_MERGE_PUSH", "1"))
+# Cloud route for the dev stage (per-issue model override; Paperclip merges
+# assigneeAdapterOverrides.adapterConfig over the agent's own config, so only model/provider change).
+#   off       always the local model (default: nothing spends Claude usage)
+#   escalate  local first; run on Claude once the local model has failed at this issue
+#             (a silent/stalled run, or PIPELINE_CLOUD_AFTER_REWORK reworks)
+#   always    every dev run on Claude
+CLOUD_MODE = cfg("PIPELINE_CLOUD_DEV", "off").lower()
+CLOUD_MODEL = cfg("PIPELINE_CLOUD_MODEL", "claude-sonnet-5")
+CLOUD_PROVIDER = cfg("PIPELINE_CLOUD_PROVIDER", "anthropic")
+CLOUD_AFTER_REWORK = int(cfg("PIPELINE_CLOUD_AFTER_REWORK", "2"))
 # Only "blocked / needs a human" and the final result reach Slack unless this is set.
 SLACK_VERBOSE = _truthy(cfg("PIPELINE_SLACK_VERBOSE"))
 
@@ -259,7 +269,7 @@ def http_patch(issue_id, body):
         raise RuntimeError(f"PATCH issue {issue_id} failed: {e.code} {e.read().decode()[:300]}")
 
 
-def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, description=_UNSET):
+def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, description=_UNSET, overrides=_UNSET):
     """`assignee=None` clears the assignee (the CLI can't express that, hence the HTTP API)."""
     body = {}
     if status is not _UNSET:
@@ -272,6 +282,8 @@ def update_issue(issue_id, status=_UNSET, assignee=_UNSET, comment=_UNSET, descr
         body["comment"] = comment
     if description is not _UNSET:
         body["description"] = description
+    if overrides is not _UNSET:
+        body["assigneeAdapterOverrides"] = overrides  # None clears a previous override
     return http_patch(issue_id, body)
 
 
@@ -444,7 +456,26 @@ def build_ctx(candidates):
     return {"busy": busy, "candidates": candidates}
 
 
-def dispatch(issue, role, text, ctx, extra=""):
+def cloud_dev(issue_id, state):
+    """Should this issue's next dev run go to Claude instead of the local model?"""
+    if CLOUD_MODE == "always":
+        return True
+    if CLOUD_MODE == "escalate" and state:
+        failed_silently = state["checks"].get(issue_id, 0) or state["retry"].get(issue_id, 0)
+        return bool(failed_silently or state["rework"].get(issue_id, 0) >= CLOUD_AFTER_REWORK)
+    return False
+
+
+def dev_overrides(issue_id, state):
+    """(override to send, note for the comment). None clears any previous override, so a later
+    run of the same issue is local again unless it escalates."""
+    if cloud_dev(issue_id, state):
+        return ({"adapterConfig": {"model": CLOUD_MODEL, "provider": CLOUD_PROVIDER}},
+                f"\n\nPipeline: this attempt runs on Claude (`{CLOUD_MODEL}`) because the local model has not managed to finish it.")
+    return None, ""
+
+
+def dispatch(issue, role, text, ctx, extra="", state=None):
     """Give the issue to the agent for `role` if it is free, otherwise park it in that agent's
     queue. Returns 'started' or 'queued'. `text` is the handoff comment either way, so the agent
     finds everything it needs when its turn comes."""
@@ -460,12 +491,18 @@ def dispatch(issue, role, text, ctx, extra=""):
             f"it will start automatically when {AGENT_NAME[agent]} is free. {extra} {tag('queue-' + role)}".replace("  ", " "),
         )
         return "queued"
-    update_issue(issue["id"], status="todo", assignee=agent, comment=f"{text}\n\n{extra} {tag(role)}".replace("  ", " "))
+    # The override lives on the ISSUE and applies to whichever agent is assigned, so every dispatch
+    # sets it explicitly: Claude for an escalated dev run, None (cleared) for everything else —
+    # otherwise QA and deploy would silently inherit Sam's cloud override.
+    overrides, note = dev_overrides(issue["id"], state) if role == "dev" else (None, "")
+    extra_kwargs = {"overrides": overrides}
+    update_issue(issue["id"], status="todo", assignee=agent,
+                 comment=f"{text}{note}\n\n{extra} {tag(role)}".replace("  ", " "), **extra_kwargs)
     ctx["busy"].setdefault(agent, set()).add(key)
     return "started"
 
 
-def handle_queue(issue, stage, ctx, dry_run):
+def handle_queue(issue, stage, ctx, state, dry_run):
     """Start a parked issue when its agent is free. run_once walks issues oldest-first and
     marks the agent busy as soon as one starts, so the queue is naturally first-in-first-out."""
     role = stage[len("queue-"):]
@@ -477,9 +514,11 @@ def handle_queue(issue, stage, ctx, dry_run):
     print(f"[{now()}] {label(issue)}: {AGENT_NAME[agent]} is free — starting queued {role}")
     if dry_run:
         return True
+    overrides, note = dev_overrides(issue["id"], state) if role == "dev" else (None, "")
+    extra_kwargs = {"overrides": overrides}
     update_issue(
         issue["id"], status="todo", assignee=agent,
-        comment=f"Pipeline: {AGENT_NAME[agent]} is free — starting. {tag(role)}",
+        comment=f"Pipeline: {AGENT_NAME[agent]} is free — starting.{note} {tag(role)}", **extra_kwargs,
     )
     ctx["busy"].setdefault(agent, set()).add(label(issue))
     return True
@@ -519,7 +558,7 @@ def send_to_sam(issue, comment, state, ctx, rework=False):
         state["rework"][issue["id"]] = n
         comment = f"Pipeline: rework {n}/{MAX_REWORK}.\n\n{comment}"
     comments = list_issue_comments(issue["id"])
-    dispatch(issue, "dev", comment + wt_instructions(comments), ctx)
+    dispatch(issue, "dev", comment + wt_instructions(comments), ctx, state=state)
     return True
 
 
@@ -568,7 +607,7 @@ def handle_claude_stage(issue, stage, stage_idx, comments, state, ctx, dry_run):
             update_issue(issue["id"], description=f"{original}\n\n---\n{ENHANCED_HEADER}\n{enhanced}\n")
             text = "Pipeline: Claude reviewed and enhanced the request (see description) — handing to dev (Sam)."
             wtc = [{"body": wt_tag(repo, wt)}]
-            dispatch(issue, "dev", text + wt_instructions(wtc), ctx, extra=wt_tag(repo, wt))
+            dispatch(issue, "dev", text + wt_instructions(wtc), ctx, extra=wt_tag(repo, wt), state=state)
             notify(f"\U0001f4dd→\U0001f527 {key}: request enhanced, handing to Sam. ({issue.get('title', '')})")
     elif stage == "spec":
         questions = parse_section(body, "questions") or "(see Claude's review on the issue)"
@@ -796,7 +835,7 @@ def handle_check(issue, stage, stage_idx, comments, state, ctx, dry_run):
         dispatch(issue, role,
                  f"Pipeline: your previous run ended without setting a status and Claude could not tell whether the "
                  f"work is finished. Finish anything outstanding, then set this issue to `done` (with what you did and "
-                 f"the evidence) or `blocked` (with why). Do not just describe the work.", ctx)
+                 f"the evidence) or `blocked` (with why). Do not just describe the work.", ctx, state=state)
     else:
         block_for_human(
             issue, f"{AGENT_NAME[agent]}'s run ended without a status and Claude judged it '{verdict}'.", role,
@@ -886,7 +925,7 @@ def handle_backlog(issue, ctx, state, dry_run):
     if stage in ("spec", "code"):
         return handle_claude_stage(issue, stage, stage_idx, comments, state, ctx, dry_run)
     if stage.startswith("queue-"):
-        return handle_queue(issue, stage, ctx, dry_run)
+        return handle_queue(issue, stage, ctx, state, dry_run)
     if stage.startswith("check-"):
         return handle_check(issue, stage, stage_idx, comments, state, ctx, dry_run)
     return False
@@ -897,8 +936,18 @@ def run_once(args, state):
     ctx = build_ctx(candidates)
     acted = 0
     for issue in sorted(candidates, key=lambda i: i.get("createdAt") or ""):
-        status = issue.get("status")
         try:
+            # The list is a snapshot and a pass can take minutes (a build gate, a merge). Re-read the
+            # issue right before acting: a human may have cancelled or moved it meanwhile, and a stale
+            # snapshot must never overwrite that (2026-09-24: a cancelled test issue was revived as
+            # `blocked` three seconds after being cancelled, and later got worked on).
+            fresh = get_issue(issue["id"])
+            if (fresh.get("status"), fresh.get("assigneeAgentId")) != (issue.get("status"), issue.get("assigneeAgentId")):
+                print(f"[{now()}] {label(issue)}: changed since the snapshot "
+                      f"({issue.get('status')} -> {fresh.get('status')}); leaving it for the next pass")
+                continue
+            issue = fresh
+            status = issue.get("status")
             if status == "backlog":
                 acted += handle_backlog(issue, ctx, state, args.dry_run)
             elif status in ("todo", "in_progress"):

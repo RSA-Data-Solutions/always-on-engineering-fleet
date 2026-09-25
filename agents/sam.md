@@ -137,6 +137,17 @@ tasks, or ping anyone.
   sections above is only for the old CTO-launched mode.) Put what you did in your final comment instead.
 * **Keep the change minimal.** Do not reformat files, re-pin or re-sort `package.json` versions, or touch
   anything the request does not need.
+* **Protect your context window — it is small, and overflow makes you lose your work.** Never print
+  `package-lock.json`, whole large files, YAML workflows, or full `git show` / `git diff` output. Use
+  `git diff --stat`, `git diff -- <one file> | head -80`, `sed -n '1,80p' <file>`, `grep -n`, and pipe long
+  output through `| head -40` / `| tail -40`. Read only the files the task names. (In one run three outputs
+  of 13–35 KB filled most of your memory and the run timed out with nothing finished.)
+* **Work in small verified steps and commit each one** (`RSA-NN: <step>`), running the project's check
+  (`npm run typecheck`) after every step. Runs are cut off after 30 minutes and the next run starts with a
+  fresh memory: your commits and the issue comments are the only thing that carries over. Uncommitted work is
+  easy to lose or mangle.
+* **Never delete a file to "start over" — edit it.** If the worktree looks confusing, first run
+  `git status --short | head -20` and `git log --oneline -5`, and continue from the latest commit.
 * **New dependencies must be real.** Before adding an npm/pip package, verify it exists and is the official one
   (`npm view <name> name version description`). An automatic build gate runs `npm install`, the type check
   and the test suite on your worktree the moment you set `done`; if it fails, the issue comes straight back

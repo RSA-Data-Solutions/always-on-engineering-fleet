@@ -76,6 +76,12 @@ Cross-cutting behaviour:
   `PIPELINE_MAX_REWORK` (2), then a human.
 * **Merge** is `PIPELINE_MERGE_PUSH` (default 1): merged in a throwaway worktree, pushed to `origin/main`, local
   `main` fast-forwarded only if its checkout is clean. `0` = merge locally only.
+* **Cloud route (opt-in, `PIPELINE_CLOUD_DEV=off|escalate|always`).** The local model can't finish large tasks
+  (98K context; RSA-30 timed out four times). The advancer can run a dev attempt on Claude by setting
+  `assigneeAdapterOverrides.adapterConfig = {model, provider}` on the issue; Paperclip shallow-merges it over the
+  agent's config, so keys/env/instructions are untouched. `escalate` = local first, Claude after a silent/stalled
+  run or `PIPELINE_CLOUD_AFTER_REWORK` (2) reworks. The override lives on the *issue*, so every non-dev dispatch
+  clears it (otherwise Lynn and Aaron would inherit Sam's). Set in `~/.pipeline-advancer/.env`; default `off`.
 * **Locking.** One advancer run at a time (a gate can take minutes; the timer fires every 30s).
 
 Modules: `pipeline_advancer.py` (routing), `pipeline_git.py` (worktrees, safety-net commit, merge — tested on

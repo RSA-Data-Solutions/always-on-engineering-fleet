@@ -117,7 +117,8 @@ class FakePaperclip:
         if "status" in body:
             issue["status"] = body["status"]
             issue["statusVersion"] += 1
-        for src, dst in (("assigneeAgentId", "assigneeAgentId"), ("description", "description")):
+        for src, dst in (("assigneeAgentId", "assigneeAgentId"), ("description", "description"),
+                         ("assigneeAdapterOverrides", "assigneeAdapterOverrides")):
             if src in body:
                 issue[dst] = body[src]
         if "comment" in body:
@@ -159,6 +160,15 @@ class PipelineTest(unittest.TestCase):
             mock.patch.object(adv, "save_state", lambda s: None),
             mock.patch.object(adv, "SLACK_VERBOSE", False),
             mock.patch.object(adv, "MERGE_PUSH", True),
+            # pin every tunable: the module reads ~/.pipeline-advancer/.env, and a test must never
+            # depend on what the host happens to have configured
+            mock.patch.object(adv, "CLOUD_MODE", "off"),
+            mock.patch.object(adv, "CLOUD_AFTER_REWORK", 2),
+            mock.patch.object(adv, "CLOUD_MODEL", "claude-sonnet-5"),
+            mock.patch.object(adv, "CLOUD_PROVIDER", "anthropic"),
+            mock.patch.object(adv, "MAX_REWORK", 2),
+            mock.patch.object(adv, "MAX_CHECKS", 3),
+            mock.patch.object(adv, "STALL_MINUTES", 20),
             mock.patch.object(pg, "repo_for_project", lambda p: "/repos/IBMiMCP" if p == "ibmimcp" else None),
             mock.patch.object(pg, "create_worktree", create_worktree),
             mock.patch.object(pg, "commit_worktree", lambda path, key, title: self.git_calls.append(("commit", key)) or "c0ffee1234"),
@@ -547,6 +557,98 @@ class PipelineTest(unittest.TestCase):
         self.assertIn("waiting", self.fp.slack[0]["text"])
 
     # -- misc
+    # -- cloud route (per-issue model override for the dev stage)
+    CLOUD = {"adapterConfig": {"model": "claude-sonnet-5", "provider": "anthropic"}}
+
+    def override(self, issue=None):
+        return self.of(issue).get("assigneeAdapterOverrides")
+
+    def test_cloud_route_is_off_by_default_nothing_ever_runs_on_claude(self):
+        with mock.patch.object(adv, "ENV_FILE", pathlib.Path("/nonexistent/.env")), mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("PIPELINE_CLOUD_DEV", None)
+            self.assertEqual(adv.cfg("PIPELINE_CLOUD_DEV", "off"), "off")  # the shipped default
+        self.to_sam()
+        self.assertIsNone(self.override())
+        self.sam_done_and_reviewed(CODE_REWORK)
+        self.sam_done_and_reviewed(CODE_REWORK)
+        self.assertIsNone(self.override())
+        self.assertFalse(any("runs on Claude" in b for b in self.bodies()))
+
+    def test_escalate_starts_local_then_moves_to_claude_after_a_silent_run(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "escalate"):
+            self.to_sam()
+            self.assertIsNone(self.override())  # first attempt: local model
+            self.fp.agent_ends_silently(self.child["id"], SAM, "I will now begin...")
+            self.advance()
+            self.claude(CHECK_UNCLEAR)
+            self.advance()  # one retry after an 'unclear' verdict
+            self.at("todo", SAM)
+            self.assertEqual(self.override(), self.CLOUD)
+            self.assertTrue(any("runs on Claude (`claude-sonnet-5`)" in b for b in self.bodies()))
+
+    def test_escalate_moves_to_claude_at_the_configured_rework_and_stays_local_before_it(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "escalate"), mock.patch.object(adv, "CLOUD_AFTER_REWORK", 2):
+            self.to_sam()
+            self.sam_done_and_reviewed(CODE_REWORK)  # rework 1
+            self.assertIsNone(self.override())
+            self.sam_done_and_reviewed(CODE_REWORK)  # rework 2 -> the last try is on Claude
+            self.assertEqual(self.override(), self.CLOUD)
+
+    def test_a_queued_issue_picks_up_the_cloud_route_when_it_finally_starts(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "escalate"):
+            self.to_sam()
+            second = self.second_issue()
+            self.state["checks"][second["id"]] = 1  # the local model already failed at this one
+            self.claude(SPEC_READY)
+            self.advance()
+            self.assertEqual((self.of(second)["status"], self.of(second)["assigneeAgentId"]), ("backlog", None))  # queued
+            self.fp.agent_finishes(self.child["id"], SAM, "done", "done")
+            self.advance(2)
+            self.assertEqual(self.of(second)["assigneeAgentId"], SAM)
+            self.assertEqual(self.override(second), self.CLOUD)
+
+    def test_always_sends_dev_to_claude_but_never_qa_or_deploy(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "always"):
+            self.to_lynn()
+            self.assertEqual(self.c["assigneeAgentId"], LYNN)
+            self.assertIsNone(self.override())  # Lynn's run must NOT inherit Sam's cloud override
+            self.assertEqual(sum("runs on Claude" in b for b in self.bodies()), 1)  # only Sam's dispatch
+
+    def test_aaron_does_not_inherit_the_cloud_override_either(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "always"):
+            self.to_lynn()
+            self.fp.agent_finishes(self.child["id"], LYNN, "done", "ok")
+            self.advance()
+        self.at("todo", AARON)
+        self.assertIsNone(self.override())
+
+    def test_a_later_local_run_clears_a_previous_cloud_override(self):
+        with mock.patch.object(adv, "CLOUD_MODE", "always"):
+            self.to_sam()
+            self.assertEqual(self.override(), self.CLOUD)
+        self.fp.agent_finishes(self.child["id"], SAM, "done", "done")
+        self.advance()
+        self.claude(CODE_REWORK)
+        self.advance()  # back to Sam with the mode now off -> the override must be cleared
+        self.at("todo", SAM)
+        self.assertIsNone(self.override())
+
+    def test_an_issue_cancelled_after_the_snapshot_is_never_revived(self):
+        """The real incident: cancelled while a pass was running; the stale snapshot then re-blocked it."""
+        self.claude(SPEC_UNCLEAR)  # Claude asked a question -> the advancer will want to block + DM
+        real = adv.list_pipeline_candidates
+
+        def snapshot_then_human_cancels(company):
+            snap = real(company)
+            self.fp.issues[self.child["id"]]["status"] = "cancelled"  # the human's cancel lands mid-pass
+            return snap
+
+        with mock.patch.object(adv, "list_pipeline_candidates", snapshot_then_human_cancels):
+            self.advance()
+        self.assertEqual(self.c["status"], "cancelled")
+        self.assertEqual(self.fp.slack, [])  # and nobody is asked a question about a dead request
+        self.assertFalse(any("needs clarification" in b for b in self.bodies()))
+
     def test_flat_issues_are_never_touched(self):
         flat = self.fp.add_issue("flat", status="done", assignee=SAM)
         self.advance()

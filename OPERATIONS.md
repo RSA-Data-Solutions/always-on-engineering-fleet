@@ -202,6 +202,19 @@ and `cd scripts/setup/ram-tools && python3 -m unittest test_ram_tools`.
 - **Merge is automatic after Lynn approves** (`PIPELINE_MERGE_PUSH=1`; `0` merges locally only). It happens in a
   throwaway worktree, never in your checkout. A conflict or rejected push blocks the issue and DMs you (the branch is
   pushed for a PR). Production deploys from main are your CI/CD.
+- **The local model can't finish large tasks — the cloud route.** RSA-30 (a multi-file client rewrite) timed out
+  four times on Qwen (98K context; runs restart with fresh memory). `PIPELINE_CLOUD_DEV=escalate` (set in
+  `~/.pipeline-advancer/.env`, currently ON) runs the dev stage on Claude via a per-issue
+  `assigneeAdapterOverrides` (Paperclip shallow-merges it over the agent's config — only model/provider change)
+  once the local model has failed at that issue (silent/stalled run, or 2 reworks). Verified: the same task
+  went from 13 typecheck errors to 0 in ~2 minutes. `off` = never, `always` = every dev run. The override lives on
+  the issue, so every non-dev dispatch clears it (otherwise Lynn/Aaron would inherit it).
+- **Never act on a stale snapshot.** The advancer re-reads each issue right before acting: a cancelled test issue
+  was once revived as `blocked` three seconds after being cancelled, and later got worked on.
+- **Worktrees get their own `node_modules` copy, never a symlink.** Through a shared link an agent's `npm install`
+  or `rm -rf node_modules/*` would modify or wipe the operator's real install. The gate also restores a missing one.
+- **Tests must not read host config.** `pipeline_advancer.py` reads `~/.pipeline-advancer/.env`; the test suite
+  pins every tunable so it passes regardless (verified with hostile env values).
 - **Ram's tools refuse workers** (`PAPERCLIP_RUN_ID` set). Mixing Ram's key with a worker's run id is rejected by
   Paperclip as "no valid run" — that silently broke every worker's `update-status` on 2026-09-23.
 - **`PAPERCLIP_API_URL` in `~/.hermes/.env` ends in `/api`**; the `paperclipai` CLI appends `/api` itself, so the
