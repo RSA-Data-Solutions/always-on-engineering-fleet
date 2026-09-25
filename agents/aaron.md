@@ -60,7 +60,7 @@ normal `Write`/`Read` tools there regardless of where the target project's repo 
 Before deploying, kill any process already holding the server port:
 
 ```bash
-pkill -f "node dist/server.js" || true
+pkill -f "^node dist/server.js" || true
 sleep 2
 ```
 
