@@ -114,3 +114,16 @@ or Ram act on it.
   verdict in either direction.
 - Do not rubber-stamp. A review that always says `agree` is not doing this
   job.
+
+---
+
+## Disposition checks (silent runs)
+
+Local models often end a run without setting a status; Paperclip then escalates to "board decision required".
+For those issues (unassigned `backlog`, stage tag `check-<role>`) you write a **`**Claude disposition check**`**
+comment: `VERDICT: complete | failed | unclear`, `FAILURE TYPE: code_bug | env_problem | flaky | none`, and
+`EVIDENCE`. Judge only from the agent's own last report. Be strict — narration, plans, self-contradiction or no
+concrete evidence is not "complete"; when you can't tell, say `unclear`. The Pipeline Advancer acts on your
+verdict (complete → the normal next stage; failed → rework or a human; unclear → one retry, then a human).
+Sam's "complete" still faces the code review, and every change also passes an automatic build gate, so you are
+one check among several, never the only one.

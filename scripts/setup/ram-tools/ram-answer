@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""ram-answer — resume a request the pipeline paused and asked the person about.
+
+  ram-answer RSA-31 "the person's answer, verbatim"
+
+Use ONLY for replies to a pipeline message like "❓ RSA-31 needs clarification" or
+"⚠️ RSA-31 … needs your look". It posts the answer on the issue and puts the request back in the queue
+at the right stage. Refuses anything that isn't a paused pipeline request. Do NOT file a new request for a reply.
+"""
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ram_common as rc
+
+RESUME = {"spec": "spec", "code": "code", "dev": "queue-dev", "qa": "queue-qa", "deploy": "queue-deploy"}
+
+
+def patch(issue_id, body):
+    key = rc.env_value(rc.ADVANCER_ENV, "PAPERCLIP_BOARD_KEY_WORKAROUND")
+    if not key:
+        raise rc.RamError("the resume key is not configured (~/.pipeline-advancer/.env)")
+    req = urllib.request.Request(f"{rc.API_BASE}/issues/{issue_id}", data=json.dumps(body).encode(), method="PATCH",
+                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read() or b"null")
+    except urllib.error.HTTPError as e:
+        raise rc.RamError(f"could not update the issue: {e.code} {e.read().decode()[:200]}")
+
+
+def _main():
+    if len(sys.argv) < 3:
+        rc.die("usage: ram-answer RSA-NN \"the person's answer\"")
+    rc.refuse_in_worker()
+    ref, answer = sys.argv[1], " ".join(sys.argv[2:]).strip()
+    if not answer:
+        rc.die("the answer is empty")
+    issue = rc.resolve(ref)
+    if not issue.get("parentId"):
+        rc.die(f"{issue['identifier']} is not a pipeline request (it has no parent epic); nothing to resume.")
+    if issue.get("status") != "blocked" or issue.get("assigneeAgentId"):
+        rc.die(f"{issue['identifier']} is not paused waiting on a person (status {issue['status']}, "
+               f"{rc.where(issue, rc.stage_of(rc.comments(issue['id'])))}). Do not resume it; use ram-status.")
+    stage = rc.stage_of(rc.comments(issue["id"]))
+    if stage not in RESUME:
+        rc.die(f"{issue['identifier']} is paused at an unknown stage '{stage}'; ask the operator.")
+    resume = RESUME[stage]
+    patch(issue["id"], {"status": "backlog",
+                        "comment": f"Answer from the requester (via Ram, Slack):\n\n{answer}\n\n[pipeline-stage: {resume}]"})
+    print(json.dumps({"status": "resumed", "issue": issue["identifier"], "resumes_at": resume,
+                      "message": f"{issue['identifier']} is back in the pipeline ({resume}); it continues automatically."}))
+
+
+def main():
+    try:
+        _main()
+    except rc.RamError as e:
+        rc.die(str(e))
+
+
+if __name__ == "__main__":
+    main()

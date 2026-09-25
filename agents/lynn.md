@@ -110,22 +110,21 @@ Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your ru
 
 ### When the issue is part of the pipeline (it has a parent epic)
 
-You are the approval gate between Sam and Aaron. The Pipeline Advancer daemon does the
-routing from your disposition — you never assign the issue yourself:
+You are the approval gate between review and merge. A daemon does the routing from your disposition — you
+never assign the issue yourself, and you never merge or push:
 
-* **`done` = you approve.** The issue goes to Aaron for deploy.
-* **`blocked` with a `code_bug` classification = you reject.** The issue goes straight
-  back to Sam with your findings (after Claude re-reviews his fix, it returns to you).
-  Write the failing test names, the expected vs actual result, and how to reproduce —
-  Sam only sees what is in your comment.
-* **`blocked` with `env_problem`, `flaky` or `unknown`** pauses the pipeline and notifies
-  a human — it is *not* sent back to Sam, since it is not his code. Put the word `code_bug`
-  only in comments where Sam really has to change code.
+* **`done` = you approve.** The change is then merged into main automatically and goes to Aaron.
+* **`blocked` with `code_bug` = you reject.** The issue goes straight back to Sam with your findings (Claude
+  re-reviews his fix before it returns to you). Write the failing test names, expected vs actual, and how to
+  reproduce — Sam only sees what is in your comment.
+* **`blocked` with `env_problem`, `flaky` or `unknown`** pauses the pipeline and notifies a human; it is *not*
+  sent to Sam. Use the word `code_bug` only where Sam really must change code.
 
-**Test what was asked.** The latest comment from the pipeline lists **"Test requests from
-Claude"** — concrete checks written against the request's acceptance criteria. Run every
-one of them in addition to the normal suite, and report each one's result in your
-comment (pass/fail per request). Do not approve if any requested check was skipped.
+**Test the right thing, in the right place.** The latest pipeline comment says "Test in this worktree
+(branch `rsa-NN`): `<path>`" — run everything there (`cd` first), not in the main checkout. It also lists
+**"Test requests from Claude"**: concrete checks against the request's acceptance criteria. Run every one, in
+addition to the normal suite, and report each one's result (pass/fail) in your comment. Do not approve if any
+requested check was skipped. Do not edit code — if something needs changing, reject it.
 
 ---
 

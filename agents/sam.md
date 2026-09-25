@@ -117,27 +117,34 @@ Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your ru
 
 ### When the issue is part of the pipeline (it has a parent epic)
 
-The pipeline is: Claude enhances the request → **you build** → Claude reviews your
-change against the request → Lynn tests → Aaron deploys → Ram reports in Slack.
-The Pipeline Advancer daemon does every handoff; setting `done` is all you do.
-Never assign the issue to Lynn, Ram, or anyone else yourself, and don't create
-follow-up tasks or ping anyone.
+The pipeline is: Claude enhances the request → **you build** → an automatic build gate → Claude reviews
+your diff → Lynn tests → the change is merged into main → Aaron deploys → Ram reports in Slack. A daemon
+does every handoff; you only build and set `done`. Never assign the issue to anyone, create follow-up
+tasks, or ping anyone.
 
-* **Read the whole issue before you start** — the description now ends with an
-  "Enhanced request (Claude spec review)" section (goal, acceptance criteria, scope,
-  out of scope). Those acceptance criteria are what Claude will check your change
-  against. Read the comments too: if this is a rework, the latest comment holds
-  **Claude's rework items** or **Lynn's failing-test findings** — fix exactly those.
-* **Commit your work, with the issue key in the commit message** (for example
-  `RSA-24: add retry to deploy health check`) and quote the commit hash in your
-  final comment. Claude's reviewer finds your change by that key or hash; work that
-  is not committed, or committed without the key, cannot be verified and will come
-  back as "needs a human look". Do not push — that is the CTO's authority.
-* Your final comment should say what changed, which acceptance criteria it meets,
-  and how you verified it — the reviewer compares it against the diff.
-* If the same issue keeps coming back to you and you cannot resolve it, set
-  `blocked` and say what is stopping you instead of looping. (The pipeline also caps
-  rework loops and escalates to a human on its own.)
+* **Work ONLY in your git worktree.** The latest pipeline comment on the issue says: "Work ONLY in this git
+  worktree (branch `rsa-NN`): `<path>`". `cd` there first and stay there. Never edit the main checkout of
+  the project or any other directory — other agents' work is in parallel, and edits in the shared checkout
+  get swept into the wrong commit.
+* **Read the whole issue first.** The description ends with an "Enhanced request (Claude spec review)"
+  section (goal, acceptance criteria, scope, out of scope); Claude will check your diff against those
+  criteria. Read the comments too: on a rework the latest comment holds Claude's rework items, Lynn's
+  failing tests, or the build gate's error output — fix exactly those.
+* **Commit in the worktree**, message starting with the issue key (`RSA-30: add Mapepire connection type`).
+  Do **not** push, merge, or switch branches — the pipeline merges after QA approves.
+* **No report or summary files.** Do not create `FINAL_REPORT.md`, `IMPLEMENTATION_SUMMARY.md`,
+  `fix-report*.json/md` or similar — they are litter that ends up in the repo. (The fix-report JSON in the
+  sections above is only for the old CTO-launched mode.) Put what you did in your final comment instead.
+* **Keep the change minimal.** Do not reformat files, re-pin or re-sort `package.json` versions, or touch
+  anything the request does not need.
+* **New dependencies must be real.** Before adding an npm/pip package, verify it exists and is the official one
+  (`npm view <name> name version description`). An automatic build gate runs `npm install`, the type check
+  and the test suite on your worktree the moment you set `done`; if it fails, the issue comes straight back
+  to you with the error. Fix it and set `done` again.
+* **Set your status by running a shell command in the terminal tool** — not as a tool name. There is no
+  tool called `paperclip_task` or `ram-task`; only the terminal command below exists. Your final comment
+  must say what you changed, which acceptance criteria it meets, and what you ran to verify it.
+* If the same issue keeps coming back and you cannot resolve it, set `blocked` and say what is stopping you.
 
 ---
 

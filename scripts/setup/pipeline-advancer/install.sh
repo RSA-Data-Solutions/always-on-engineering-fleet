@@ -39,8 +39,8 @@ fi
 
 say "Installing to $INSTALL_DIR"
 mkdir -p "$INSTALL_DIR"
-cp "$SCRIPT_DIR/pipeline_advancer.py" "$INSTALL_DIR/pipeline_advancer.py"
-ok "copied pipeline_advancer.py"
+cp "$SCRIPT_DIR/pipeline_advancer.py" "$SCRIPT_DIR/pipeline_git.py" "$SCRIPT_DIR/pipeline_gate.py" "$INSTALL_DIR/"
+ok "copied pipeline_advancer.py + pipeline_git.py + pipeline_gate.py"
 
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then
   cp "$SCRIPT_DIR/pipeline-advancer.env.example" "$INSTALL_DIR/.env"

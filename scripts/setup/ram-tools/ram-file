@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""ram-file — file a build/fix/change request into the delivery pipeline (epic + child in one call).
+
+  ram-file --title "Short title" --request "Full request, the person's own words + constraints" [--thread 1790.123] [--force]
+
+Refuses (returns the existing issue) if a similar unfinished request already exists, so a repeated or
+re-worded message can't create a duplicate. Prints ONE JSON object; report only what it says.
+"""
+import argparse
+import json
+import os
+import subprocess
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ram_common as rc
+
+
+def bridge(*args):
+    env = {k: v for k, v in os.environ.items() if not k.startswith("PAPERCLIP_")}
+    for name in ("PAPERCLIP_API_URL", "PAPERCLIP_BRIDGE_API_KEY", "PAPERCLIP_COMPANY_ID", "PAPERCLIP_AGENT_ID"):
+        env[name] = rc.env_value(rc.HERMES_ENV, name)
+    if not env["PAPERCLIP_BRIDGE_API_KEY"]:
+        raise rc.RamError("PAPERCLIP_BRIDGE_API_KEY is missing from ~/.hermes/.env")
+    r = subprocess.run([rc.NODE, str(rc.BRIDGE_SCRIPT), *args], capture_output=True, text=True, timeout=60, env=env)
+    if r.returncode != 0:
+        raise rc.RamError(f"task-bridge failed: {(r.stderr or r.stdout).strip()[:400]}")
+    return json.loads(r.stdout)["issue"]
+
+
+def _main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--title", required=True)
+    ap.add_argument("--request", required=True)
+    ap.add_argument("--thread", default="")
+    ap.add_argument("--force", action="store_true", help="file even if a similar request exists")
+    a = ap.parse_args()
+    rc.refuse_in_worker()
+    if len(a.request.split()) < 5:
+        rc.die("the request is too short to act on — write the goal, the project, and what 'done' looks like.")
+    if not a.force:
+        dup = rc.find_duplicate(a.title, a.request, rc.open_children())
+        if dup:
+            cs = rc.comments(dup["id"])
+            print(json.dumps({
+                "status": "duplicate", "existing": dup["identifier"], "title": dup["title"],
+                "where": rc.where(dup, rc.stage_of(cs)),
+                "message": f"A similar request is already in the pipeline as {dup['identifier']} — nothing was filed. "
+                           f"Tell the person; if it is genuinely a different request, re-run with --force.",
+            }))
+            return
+    origin = f"thread_ts={a.thread}" if a.thread else "none"
+    epic = bridge("create-task", "--project-id", rc.PROJECT_ID, "--unassigned", "--status", "backlog",
+                  "--title", f"Feature: {a.title}", "--description", f"SLACK_ORIGIN: {origin} -- Request: {a.request}")
+    try:
+        child = bridge("create-task", "--project-id", rc.PROJECT_ID, "--parent-id", epic["id"], "--unassigned",
+                       "--status", "backlog", "--title", a.title, "--description", a.request)
+    except rc.RamError as e:
+        rc.die(f"the tracking epic {epic['identifier']} was created but the request itself could not be filed: {e}. "
+               f"Tell the operator; do not retry blindly (it would create a second epic).")
+    print(json.dumps({"status": "filed", "epic": epic["identifier"], "request": child["identifier"],
+                      "message": f"Filed as {child['identifier']} (tracking epic {epic['identifier']}). Claude reviews it "
+                                 f"first, then Sam builds it; the result is posted here when it is deployed."}))
+
+
+def main():
+    try:
+        _main()
+    except rc.RamError as e:
+        rc.die(str(e))
+
+
+if __name__ == "__main__":
+    main()

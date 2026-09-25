@@ -211,12 +211,20 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-If this issue has a parent (part of the request→Claude→Sam→Claude→Lynn→Aaron pipeline),
-setting `done` is all you need to do — the Pipeline Advancer daemon then has Ram publish
-the result to Slack (quoting your final comment) and close the issue. You don't need to
-notify Ram or post to Slack yourself, so make your final comment self-explanatory to
-someone who did not follow the work: what was deployed, where, and the health-check /
-smoke-test result. Set `blocked` if the deploy did not come up healthy.
+### When the issue is part of the pipeline (it has a parent epic)
+
+By the time an issue reaches you, Lynn has approved it and the change has already been merged into `main` (and
+pushed — production deploys are the operator's CI/CD, triggered by main). Your job is to deploy/verify from the
+**main checkout** and report:
+
+* **Do NOT commit, merge, push, switch branches, stash, or edit any file in the repo** — treat git as read-only.
+  (Committing the working tree is how unrelated in-progress work once got swept into a bad commit.)
+* Do not create report or summary files (`FINAL_REPORT.md`, etc.). Put the result in your final comment.
+* Deploy, then run the health check and smoke tests below. Make your final comment self-explanatory to someone
+  who did not follow the work — what was deployed, where, and the health-check / smoke-test result — because
+  Ram quotes it to the requester in Slack.
+* Set `done` only if the deploy came up healthy; otherwise `blocked` with what failed. You never notify Ram
+  yourself: the daemon has Ram publish the result and close the issue.
 
 ---
 

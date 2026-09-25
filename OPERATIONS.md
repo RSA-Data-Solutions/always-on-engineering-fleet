@@ -153,71 +153,79 @@ new one, update `.env` (and Ram's `adapterConfig.env.PAPERCLIP_API_KEY`), and re
 
 ---
 
-## Delivery pipeline (Slack request → deployed → reported back)
+## Delivery pipeline (Slack request → merged → deployed → reported back)
 
-This is the as-built flow for any *build / fix / change* request. (Status questions use
-`paperclipai issue list`; research goes to Dhira directly — neither uses the pipeline.)
+The as-built flow for any *build / fix / change* request. (Questions and research are just answered by Ram.)
 
 ```text
-Slack → Ram (acknowledges; files epic + child, unassigned/backlog)
-      → Claude spec review     enhances the request (needs-clarification → asks you in Slack)
-      → Sam                    builds; commits with the issue key
-      → Claude code review     checks the diff against the request, writes test requests
-                               (rework → back to Sam)
-      → Lynn                   runs the suite + Claude's test requests
-                               (done = approve; code_bug → back to Sam)
-      → Aaron                  deploys
-      → Ram                    posts the result in the origin Slack thread, closes the task
+Slack → Ram (Claude)   ram-file: acknowledges, files epic + request (refuses duplicates)
+      → Claude spec review     enhances the request; picks the owning project
+                               (needs-clarification → asks you in Slack; you answer Ram → ram-answer)
+      → git worktree + branch  cut from origin/main for THIS issue (~/.fleet-worktrees/<repo>/RSA-NN)
+      → Sam                    builds in the worktree, commits with the issue key
+      → build gate             deterministic: npm install (if deps changed) · typecheck · tests
+                               (fail → straight back to Sam with the output; Claude/Lynn never see it)
+      → Claude code review     the branch diff vs main against the request; writes test requests
+                               (rework → Sam; can't verify → asks you)
+      → Lynn                   tests in the worktree (done = approve; code_bug → Sam)
+      → MERGE                  branch → main, pushed to origin (production deploy is your CI/CD)
+      → Aaron                  deploys/verifies from main; git is read-only for him
+      → Ram                    posts the result in the origin Slack thread; issue + epic closed
 ```
-
-Who does what, and where it lives:
 
 | Piece | Runs as | Does |
 |---|---|---|
-| Ram | Hermes gateway, persona in `~/.hermes/SOUL.md` | Acknowledges in Slack, files the epic + child. Does **not** assign work to Sam/Lynn/Aaron for pipeline requests. |
-| Claude Supervisor | `claude-supervisor.timer` (30s) → `process` agent → `claude_supervisor.py` | Writes the spec review and code review as comments (Claude via the `claude` CLI, no tools). Also still gives the old `in_review` second opinion. |
-| Pipeline Advancer | `pipeline-advancer.timer` (30s) → `process` agent → `pipeline_advancer.py` | The only router: reads each stage's result and reassigns. Posts the final Slack message as the bot (Ram's identity) and closes. |
-| Sam / Lynn / Aaron | `hermes_local` | Do their stage, set `done`/`blocked`. Never assign the issue onward. |
+| Ram | Hermes gateway on **Claude Sonnet 5** (`~/.hermes`), persona in `~/.hermes/SOUL.md` | Front door. Three commands only: `ram-file`, `ram-status`, `ram-answer` (in `~/.hermes/bin`, source in `scripts/setup/ram-tools/`). Never assigns work himself. |
+| Claude Supervisor | `claude-supervisor.timer` (30s) → `claude_supervisor.py` | Writes spec reviews, code reviews (from the worktree diff) and disposition checks as comments. |
+| Pipeline Advancer | `pipeline-advancer.timer` (30s) → `pipeline_advancer.py` (+ `pipeline_git.py`, `pipeline_gate.py`) | The only router: worktrees, queue, gate, handoffs, merge, final Slack post. Run-locked; 900s timeout. |
+| Sam / Lynn / Aaron | `hermes_local` via `~/.hermes-workers/bin/hermes-worker` | Do their stage, set `done`/`blocked`. Never assign onward. |
 
-Full stage map, rework rules, and the design reasons (notably why Claude's stages are
-unassigned `backlog` issues, not assigned to Claude Supervisor) are in
-`scripts/setup/pipeline-advancer/README.md`. Test it offline with
-`python3 -m unittest scripts/setup/pipeline-advancer/test_pipeline_advancer.py`.
+Full stage map and design reasons: `scripts/setup/pipeline-advancer/README.md`. Offline tests (90 tests, real git
+repos for the git/gate logic): `cd scripts/setup/pipeline-advancer && python3 -m unittest discover -p "test_*.py"`
+and `cd scripts/setup/ram-tools && python3 -m unittest test_ram_tools`.
+
+### Hard-won rules (each one is a real failure from 2026-09-22..24)
+
+- **Workers have their own Hermes home** (`~/.hermes-workers`, neutral persona, own memory). Until 2026-09-24
+  every worker session carried Ram's SOUL.md ("You are Ram, CTO") because all agents shared `~/.hermes`.
+  Sam/Lynn/Aaron/Dhira reach it via `adapterConfig.hermesCommand`; `persistSession` is off and
+  `maxConcurrentRuns` is 1. (Dhira additionally has `worktreeMode: true` outside a git repo and fails at start — unrelated, unfixed.)
+- **One pipeline issue per agent at a time.** llama.cpp serves one request at a time (`--parallel 1`); three
+  concurrent Sam runs starved each other into 30-minute timeouts. Extra issues wait in `backlog` with
+  `[pipeline-stage: queue-<role>]` and start automatically, oldest first.
+- **Silent runs are judged, not trusted.** A local model that ends a run without a status makes Paperclip demand
+  a "board decision". The advancer sends such issues (and `in_progress` ones with no live run for
+  `PIPELINE_STALL_MINUTES`=20) to Claude for a **disposition check**; complete/failed/unclear then routes normally.
+- **Nothing is merged on narration.** Sam's change must pass the build gate, Claude's diff review and Lynn's
+  tests. The gate exists because Sam once imported an npm package that does not exist (`mapepire`; the real one is
+  `@ibm/mapepire-js`) and mocked unit tests would have passed it.
+- **Merge is automatic after Lynn approves** (`PIPELINE_MERGE_PUSH=1`; `0` merges locally only). It happens in a
+  throwaway worktree, never in your checkout. A conflict or rejected push blocks the issue and DMs you (the branch is
+  pushed for a PR). Production deploys from main are your CI/CD.
+- **Ram's tools refuse workers** (`PAPERCLIP_RUN_ID` set). Mixing Ram's key with a worker's run id is rejected by
+  Paperclip as "no valid run" — that silently broke every worker's `update-status` on 2026-09-23.
+- **`PAPERCLIP_API_URL` in `~/.hermes/.env` ends in `/api`**; the `paperclipai` CLI appends `/api` itself, so the
+  wrappers unset it (otherwise every call 404s).
+- **Slack sessions are per thread and frozen at start.** A Hermes session keeps the system prompt it started with;
+  after editing SOUL.md, restart the gateway AND start a new thread (or `/new`).
+- **Clarification answers** go through `ram-answer` (board-key-backed, refuses anything but a paused pipeline
+  request). Ram's own bridge key cannot write to existing issues.
 
 Things worth knowing:
 
-- **Only enrolled issues (those with a `parentId`) are pipeline-routed.** A flat issue is never touched.
-- **Human-in-the-loop points:** Claude asks for clarification (issue blocked, question DMed);
-  Claude can't verify the diff; Lynn blocks for a non-code reason; rework exceeds
-  `PIPELINE_MAX_REWORK` (2). Each blocks the issue and DMs you. To resume, fix the cause and set
-  the issue back to `backlog` (spec/code review) or `todo` (agent stage).
-- **Slack is deliberately quiet:** only those human-needed events and the final result. Set
-  `PIPELINE_SLACK_VERBOSE=1` in `~/.pipeline-advancer/.env` for a message per handoff.
-- **The final message goes to the thread recorded in the epic's `SLACK_ORIGIN:`**, else your DM.
-- **Old issues are not migrated.** RSA-4/8/17–20 predate this and are flat, so they stay put.
-- **Claude only sees what's committed.** Sam commits with the issue key (in his instructions);
-  the code review finds the diff via `git log --all` on the key or a hash quoted in comments, and
-  answers `needs-human-look` if it finds none.
-- Both daemons write with a board-level workaround key over the HTTP API because of upstream
-  bug paperclipai/paperclip#13708; revert when it ships. See each daemon's README.
-
-### Ram's SOUL.md section (lives outside the repo)
-
-`~/.hermes/SOUL.md` is not in git, so the pipeline-intake section is summarised here: Ram
-must (1) acknowledge immediately, (2) write the request down (goal, project, done-criteria,
-the person's own words, no invented details; ask one question if too vague), (3) file the
-epic, (4) file the child under it — both `--unassigned --status backlog` via the task-bridge
-skill, epic description starting `SLACK_ORIGIN: thread_ts=<id> -- Request: …`, (5) report
-the real issue numbers, then stop. After editing SOUL.md run `hermes gateway restart`.
+- **Only enrolled issues (those with a `parentId`) are pipeline-routed.** Flat issues are never touched.
+- **Human-in-the-loop points:** Claude asks for clarification; Claude can't verify the diff; Lynn blocks for a
+  non-code reason; rework exceeds `PIPELINE_MAX_REWORK` (2); merge conflict; rejected push; an agent that
+  keeps going silent (`PIPELINE_MAX_CHECKS`=3). Each blocks the issue and DMs you.
+- **Slack is deliberately quiet:** only those events and the final result. `PIPELINE_SLACK_VERBOSE=1` adds every handoff.
+- Both daemons write with a board-level workaround key over the HTTP API (upstream bug paperclipai/paperclip#13708).
 
 ### Pushing instruction changes to live agents
 
-The repo file is the source of truth, but two cautions learned 2026-09-23:
-- **Aaron:** the live bundle contains a real `ADMIN_API_KEY` that the repo copy deliberately
-  omits (commit d1e0e04). Do not `instructions-file:put` `agents/aaron.md` wholesale — patch
-  just the changed section in the live file, or the health-check auth breaks.
-- **Sam:** a UI edit had added a "Step 6 — hand off to QA / assign to Lynn" that conflicts with
-  the advancer. The repo file has no such step; pushing it removes the conflict.
+The repo file is the source of truth, but:
+- **Aaron:** the live bundle contains a real `ADMIN_API_KEY` that the repo copy omits. Never `instructions-file:put`
+  `agents/aaron.md` wholesale — patch the changed section into the live file.
+- **Ram** has no instruction bundle in use: his behaviour is `~/.hermes/SOUL.md` (not in git; reproduced in spirit above).
 
 ## Approvals
 

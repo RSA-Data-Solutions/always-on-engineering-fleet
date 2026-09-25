@@ -40,53 +40,58 @@ These three were explicit product choices, made 2026-09-22:
    via `chat.postMessage` with `channel=<that user id>` — opens/reuses the
    same DM rather than posting to a separate ops channel.
 
-## The pipeline (revised 2026-09-23)
+## The pipeline (revised 2026-09-24)
 
 ```
-Slack ─▶ Ram acknowledges, files epic + child (unassigned, backlog)
-          │
-  1 SPEC  │ Claude Supervisor: "**Claude spec review**" (enhanced request)
-          │   ready              → description enriched, assigned to Sam (todo)
-          │   needs-clarification → blocked, Slack question   (human answers, sets backlog → re-review)
-  2 DEV   │ Sam works, sets done
-          │   done               → unassigned + backlog, stage=code
-  3 REVIEW│ Claude Supervisor: "**Claude code review**" against the request + the diff
-          │   approve            → assigned to Lynn (todo) with Claude's TEST REQUESTS
-          │   rework             → back to Sam (todo) with REWORK ITEMS      (counts as a rework)
-          │   needs-human-look   → blocked, Slack-notify (e.g. no diff found)
-  4 QA    │ Lynn tests, sets done or blocked
-          │   done               → Aaron (todo)                              (= Lynn approves)
-          │   blocked + code_bug → back to Sam (todo) with her findings      (counts as a rework)
-          │   blocked otherwise  → paused, Slack-notify
-  5 DEPLOY│ Aaron deploys, sets done
-          │   done               → result posted to Slack in Ram's name (origin thread
-          ▼                        if recorded, else the DM); issue + epic closed
+Slack ─▶ Ram files epic + child (ram-file; unassigned, backlog)
+  1 SPEC    Claude: "**Claude spec review**"
+              ready              → git worktree cut for the issue (project from Claude's PROJECT line) → Sam
+              needs-clarification / unknown project → blocked, Slack question
+  2 DEV     Sam builds in the worktree, sets done
+              done               → safety-net commit of loose work (report litter excluded)
+                                 → BUILD GATE (deps · typecheck · tests)   fail → back to Sam (rework)
+                                 → stage code
+  3 REVIEW  Claude: "**Claude code review**" of the worktree diff
+              approve            → Lynn, with Claude's test requests
+              rework             → Sam (rework)
+              needs-human-look   → blocked, Slack
+  4 QA      Lynn tests in the worktree
+              done               → MERGE branch into main + push → Aaron
+              blocked + code_bug → Sam (rework)        blocked otherwise → paused, Slack
+              conflict / push rejected → blocked, Slack (branch pushed for a PR)
+  5 DEPLOY  Aaron deploys from main (git read-only), sets done
+              done               → Slack result (origin thread), issue + epic closed, worktree removed
 ```
 
-Rework loops (Claude `rework` and Lynn `code_bug`) share one counter per issue,
-capped at `PIPELINE_MAX_REWORK` (default 2); past that the issue is blocked and a
-human is notified. After any rework Sam's fix goes back through the Claude code
-review before Lynn sees it again.
+Cross-cutting behaviour:
 
-Every transition also leaves a comment on the issue (the board's audit trail). Slack
-only hears about things a human needs to act on, plus the final result;
-`PIPELINE_SLACK_VERBOSE=1` adds every handoff.
+* **Queue per agent.** One pipeline issue per agent (single llama slot). Others park as
+  `[pipeline-stage: queue-<role>]`, unassigned, and start automatically when the agent is free (oldest first).
+* **Silent runs.** An agent run that ends without a status (Paperclip: "needs a disposition"), or an
+  `in_progress` issue with no live run for `PIPELINE_STALL_MINUTES` (20), becomes
+  `[pipeline-stage: check-<role>]`; Claude Supervisor writes a "**Claude disposition check**" (complete / failed /
+  unclear + failure type) and this daemon acts: complete → the normal next stage, failed+code_bug → Sam,
+  unclear → one retry, then a human. At most `PIPELINE_MAX_CHECKS` (3) per issue.
+* **Rework** (Claude `rework`, Lynn `code_bug`, build-gate failure) shares one counter, capped at
+  `PIPELINE_MAX_REWORK` (2), then a human.
+* **Merge** is `PIPELINE_MERGE_PUSH` (default 1): merged in a throwaway worktree, pushed to `origin/main`, local
+  `main` fast-forwarded only if its checkout is clean. `0` = merge locally only.
+* **Locking.** One advancer run at a time (a gate can take minutes; the timer fires every 30s).
 
-**The stage lives in the issue itself.** The advancer's comments carry a
-`[pipeline-stage: spec|dev|code|qa|deploy]` tag; Claude Supervisor reads the latest tag
-to know which review to write and treats a review as done once its comment appears after
-that tag. There is no separate stage field (the CLI can't set one) and Claude Supervisor
-keeps no state for this.
+Modules: `pipeline_advancer.py` (routing), `pipeline_git.py` (worktrees, safety-net commit, merge — tested on
+real repos), `pipeline_gate.py` (build gate; add a project with `PIPELINE_GATE_<PROJECT>` JSON or in `DEFAULT_GATES`).
+
+Every transition leaves a comment on the issue. Slack only hears about things a human must act on, plus the final
+result (`PIPELINE_SLACK_VERBOSE=1` adds every handoff).
+
+**The stage lives in the issue itself**: `[pipeline-stage: spec|dev|code|qa|deploy|queue-*|check-*]` and
+`[pipeline-worktree: repo=… path=… branch=…]` tags in this daemon's comments.
 
 ### Why Claude's stages are "unassigned + backlog"
 
-An obvious design assigns the issue to the Claude Supervisor agent while Claude works.
-That fails: verified live 2026-09-23, assigning to a `process`-adapter agent wakes it, and
-when the run ends without setting a disposition Paperclip auto-blocks the issue ("needs a
-disposition… a board decision is required"). Claude Supervisor is advisory and never sets
-a status, so every issue would block at step 1. An unassigned `backlog` issue wakes
-nobody. The advancer therefore also writes over the HTTP API rather than the CLI, because
-`paperclipai issue update` cannot clear an assignee.
+Assigning to the Claude Supervisor `process` agent wakes it, and when the run ends without a disposition Paperclip
+auto-blocks the issue (verified 2026-09-23). An unassigned `backlog` issue wakes nobody. The advancer writes over the
+HTTP API because `paperclipai issue update` cannot clear an assignee.
 
 ## Enrollment: parentId, not a label
 

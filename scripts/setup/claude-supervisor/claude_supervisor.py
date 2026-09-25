@@ -383,6 +383,8 @@ def file_board_escalation(company_id, issue_id, issue, review_text):
 
 SPEC_MARK = "**Claude spec review**"
 CODE_MARK = "**Claude code review**"
+CHECK_MARK = "**Claude disposition check**"
+WT_TAG_RE = re.compile(r"\[pipeline-worktree:\s*repo=(\S+)\s+path=(\S+)\s+branch=(\S+)\]")
 STAGE_TAG_RE = re.compile(r"\[pipeline-stage:\s*([a-z-]+)\]", re.IGNORECASE)
 
 # Each Claude call can take up to 120s and the Paperclip process adapter kills
@@ -393,9 +395,11 @@ RUN_BUDGET_SECONDS = int(os.environ.get("CLAUDE_SUPERVISOR_RUN_BUDGET", "140"))
 PROJECTS_BLURB = (
     "Projects the fleet works on (this is what you know about them — treat it as fact, do not ask about it):\n"
     "- IBMiMCP: an MCP server exposing IBM i tools (DB2 for i / QSYS2 SQL services, IFS, jobs, objects, source "
-    "members). Python. The IBM i connection layer lives HERE: the connection method is chosen by configuration "
-    "(IBMI_CONNECTION_TYPE = ssh (default), jdbc (JT400), plus REST APIs). Tests: `python3 run_tests.py`. Anything "
-    "about HOW the fleet connects to an IBM i host belongs in IBMiMCP.\n"
+    "members). TypeScript / Node.js (src/, built with `tsc`, run with `tsx`, deps such as ssh2 and node-jt400; "
+    "NOT Python). The IBM i connection layer lives HERE: the connection method is chosen by configuration "
+    "(IBMI_CONNECTION_TYPE = ssh (default), jdbc (JT400), plus REST APIs), implemented in src/ibmi/ "
+    "(ssh-client.ts, jdbc-client.ts, connectionManager.ts) and src/config/. Anything about HOW the fleet connects "
+    "to an IBM i host belongs in IBMiMCP.\n"
     "- iNova: a Python/FastAPI orchestrator (orchestrator/app/) + Next.js frontend (frontend/) + Docker Compose. It "
     "includes the 'iNova IDE' (code-server-base/: an OpenVSCode Server container for RPGLE/CL/SQL work). The iNova "
     "IDE reaches IBM i ONLY through IBMiMCP — it has no connection layer of its own, so a new IBMiMCP connection "
@@ -422,8 +426,14 @@ def pipeline_stage(comments):
     return stage, idx
 
 
+def review_mark(stage):
+    if stage == "spec":
+        return SPEC_MARK
+    return CHECK_MARK if stage.startswith("check-") else CODE_MARK
+
+
 def already_reviewed(comments, stage, stage_idx):
-    mark = SPEC_MARK if stage == "spec" else CODE_MARK
+    mark = review_mark(stage)
     return any(i > stage_idx and mark in (c.get("body") or "") for i, c in enumerate(comments))
 
 
@@ -511,11 +521,79 @@ def build_code_prompt(issue, comments, diff_context):
     return "\n\n".join(parts)
 
 
+def worktree_of(comments):
+    info = None
+    for c in comments:
+        m = WT_TAG_RE.search(c.get("body") or "")
+        if m:
+            info = {"repo": m.group(1), "path": m.group(2), "branch": m.group(3)}
+    return info
+
+
+def worktree_diff(path, max_chars=30000):
+    """What Sam actually changed: commits + patch of the issue's branch against main, plus any
+    uncommitted work in its worktree. None if the worktree is gone or has no change at all."""
+    if not os.path.isdir(path):
+        return None
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=path, capture_output=True, text=True, timeout=30).stdout
+
+    base = "origin/main" if subprocess.run(["git", "rev-parse", "--verify", "-q", "origin/main"], cwd=path,
+                                           capture_output=True).returncode == 0 else "main"
+    parts = [f"$ git log --oneline {base}..HEAD\n" + git("log", "--oneline", f"{base}..HEAD"),
+             f"$ git diff --stat {base}...HEAD\n" + git("diff", "--stat", f"{base}...HEAD"),
+             git("diff", f"{base}...HEAD")]
+    dirty = git("status", "--porcelain", "--untracked-files=no").strip()
+    if dirty:
+        parts.append("UNCOMMITTED CHANGES in the worktree:\n" + dirty + "\n" + git("diff", "HEAD"))
+    text = "\n".join(parts)
+    changed = git("diff", "--stat", f"{base}...HEAD").strip() or dirty
+    return text[:max_chars] if changed else None
+
+
+CHECK_ROLES = {
+    "dev": ("Sam (engineer)", "implement the change described in the issue, in his git worktree. 'complete' needs his "
+            "report to state what he changed and that it was verified; a code review of the actual diff follows, so "
+            "you are judging only whether he says he finished."),
+    "qa": ("Lynn (QA)", "run the test suite AND every test request from Claude's code review, and approve only if they "
+           "pass. 'complete' needs explicit evidence of passing results for the requested checks (counts, outputs). "
+           "Any reported failure means 'failed'; classify it code_bug (the code is wrong), env_problem "
+           "(environment/tooling), or flaky."),
+    "deploy": ("Aaron (devops)", "deploy from main and verify it. 'complete' needs explicit evidence that the deploy "
+               "and health/smoke checks succeeded. Any reported failure means 'failed'."),
+}
+
+
+def build_check_prompt(issue, comments, role):
+    who, duty = CHECK_ROLES[role]
+    return "\n\n".join(
+        [
+            f"An engineering agent, {who}, finished a run on the issue below WITHOUT setting a status (its local model "
+            f"often forgets), so Paperclip escalated to a human. Judge the outcome from the agent's own last report. "
+            f"Its job was to {duty}",
+            "Be strict: an agent that only narrates or plans, contradicts itself, reports an error, or gives no "
+            "concrete evidence is NOT complete. Answer 'unclear' when you cannot tell. Never guess in the agent's favour.",
+            f"## Issue {issue.get('identifier', '')}\n{issue.get('title', '')}\n\n{issue.get('description', '')}",
+            f"## Comments (oldest first)\n{format_comments(comments[-12:]) or '(none)'}",
+            "Respond in this exact structure:\n"
+            "1. VERDICT: complete | failed | unclear\n"
+            "2. FAILURE TYPE: code_bug | env_problem | flaky | none\n"
+            "3. EVIDENCE: the specific lines of the agent's last report that justify the verdict",
+        ]
+    )
+
+
 def find_pipeline_diff(issue, comments):
     """Best-effort change lookup across the local repos and ALL branches:
     commits whose message mentions the issue key (whole-token match, so RSA-2
     doesn't match RSA-24), plus any commit hash quoted in the issue's
     comments. Capped for prompt size. A miss is normal, not an error."""
+    wt = worktree_of(comments)
+    if wt:
+        wd = worktree_diff(wt["path"])
+        if wd:
+            return f"# worktree {wt['path']} (branch {wt['branch']})\n{wd}"
     key = issue.get("identifier") or ""
     hashes = set()
     for c in comments:
@@ -563,7 +641,9 @@ def run_pipeline_reviews(args, started):
         key = issue.get("identifier") or issue.get("id")
         comments = sorted_comments(list_issue_comments(issue["id"]))
         stage, stage_idx = pipeline_stage(comments)
-        if stage not in ("spec", "code") or already_reviewed(comments, stage, stage_idx):
+        if not (stage in ("spec", "code") or stage.startswith("check-")) or already_reviewed(comments, stage, stage_idx):
+            continue
+        if stage.startswith("check-") and stage[len("check-"):] not in CHECK_ROLES:
             continue
         print(f"[{datetime.datetime.now().isoformat()}] pipeline {stage} review for {key}: {issue.get('title', '')}")
         if args.dry_run:
@@ -571,6 +651,8 @@ def run_pipeline_reviews(args, started):
             continue
         if stage == "spec":
             prompt, mark = build_spec_prompt(issue, comments), SPEC_MARK
+        elif stage.startswith("check-"):
+            prompt, mark = build_check_prompt(issue, comments, stage[len("check-"):]), CHECK_MARK
         else:
             prompt, mark = build_code_prompt(issue, comments, find_pipeline_diff(issue, comments)), CODE_MARK
         try:

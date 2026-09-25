@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""ram-status — what is actually in flight. Report exactly what this prints; never guess.
+
+  ram-status            every unfinished pipeline request
+  ram-status RSA-30     one request in detail (recent history)
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ram_common as rc
+
+
+def _main():
+    rc.refuse_in_worker()
+    if len(sys.argv) > 1:
+        i = rc.resolve(sys.argv[1])
+        cs = rc.comments(i["id"])
+        stage = rc.stage_of(cs)
+        print(f"{i['identifier']}  {i['title']}\nstatus: {i['status']}  |  {rc.where(i, stage)}\n\nRecent history:")
+        for c in cs[-6:]:
+            who = rc.AGENTS.get(c.get("authorAgentId") or "", c.get("authorType") or "?")
+            body = " ".join((c.get("body") or "").split())
+            print(f"- [{c['createdAt'][5:16]}] {who}: {body[:260]}")
+        return
+    items = rc.open_children()
+    if not items:
+        print("Nothing in flight: no unfinished pipeline requests.")
+        return
+    print(f"{len(items)} unfinished pipeline request(s):")
+    for i in items:
+        cs = rc.comments(i["id"])
+        print(f"- {i['identifier']}  {i['title'][:70]}  —  {rc.where(i, rc.stage_of(cs))}")
+
+
+def main():
+    try:
+        _main()
+    except rc.RamError as e:
+        rc.die(str(e))
+
+
+if __name__ == "__main__":
+    main()
