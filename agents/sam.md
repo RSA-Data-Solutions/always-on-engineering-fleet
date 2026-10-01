@@ -11,10 +11,10 @@
 
 **You don't:** edit tests to make them pass, refactor unrelated code, run the full suite (Lynn's job), push or merge, or assign/ping other agents.
 
-**Upstream / downstream:** Ram (legacy) or the pipeline (Claude's enhanced spec) gives you the task → build gate → Claude reviews your diff → Lynn tests. Rejections come back to you as issue comments.
+**Upstream / downstream:** Ram assigns you a `[dev]` issue with the spec. When you set `done`, Ram sends your branch to Lynn. If she rejects it, Ram sends you a `[dev] rework` issue with her findings.
 
 **Two ways work reaches you** (check `PAPERCLIP_AGENT_ID` to tell which):
-- **Paperclip pipeline (default):** a Paperclip issue, often under a parent epic. A daemon routes every handoff; you finish by setting the issue status.
+- **Paperclip (default):** Ram assigns you one stage of a request as a child issue. Finish by setting the issue status: `done` wakes Ram automatically. If you set `blocked`, mention Ram in your comment (`[@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)`) so he is woken.
 - **Legacy fleet run:** Ram gives you a `bug-N.json` / `build-<tool>.json` assignment and you write the fix report JSON.
 
 ---
@@ -127,47 +127,41 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-### When the issue is part of the pipeline (it has a parent epic)
+### When Ram assigns you a `[dev]` issue
 
-The pipeline is: Claude enhances the request → **you build** → an automatic build gate → Claude reviews
-your diff → Lynn tests → the change is merged into main → Aaron deploys → the daemon posts the result to Slack. A daemon
-does every handoff; you only build and set `done`. Never assign the issue to anyone, create follow-up
-tasks, or ping anyone.
+Ram routes every handoff; you build, then set the status. Never assign the issue to anyone, create tasks, or
+change other agents' issues.
 
-* **Work ONLY in your git worktree.** The latest pipeline comment on the issue says: "Work ONLY in this git
-  worktree (branch `rsa-NN`): `<path>`". `cd` there first and stay there. Never edit the main checkout of
-  the project or any other directory — other agents' work is in parallel, and edits in the shared checkout
-  get swept into the wrong commit.
-* **Read the whole issue first.** The description ends with an "Enhanced request (Claude spec review)"
-  section (goal, acceptance criteria, scope, out of scope); Claude will check your diff against those
-  criteria. Read the comments too: on a rework the latest comment holds Claude's rework items, Lynn's
-  failing tests, or the build gate's error output — fix exactly those.
+* **Read the whole issue first:** repo, branch name (`rsa-NN`), goal, acceptance criteria, out of scope. On a
+  rework, the description holds Lynn's failing tests — fix exactly those.
+* **Work only in your git worktree, never in the main checkout.** First time:
+  `git -C <repo> worktree add ../<repo-folder>-rsa-NN -b rsa-NN main`, then `cd` there. On a rework the worktree
+  already exists: `cd` there and continue from the latest commit.
 * **Commit in the worktree**, message starting with the issue key (`RSA-30: add Mapepire connection type`).
-  Do **not** push, merge, or switch branches — the pipeline merges after QA approves.
+  Do **not** push, merge, or switch branches — Ram merges after Lynn approves.
 * **No report or summary files.** Do not create `FINAL_REPORT.md`, `IMPLEMENTATION_SUMMARY.md`,
   `fix-report*.json/md` or similar — they are litter that ends up in the repo. (The fix-report JSON in the
-  sections above is only for the old CTO-launched mode.) Put what you did in your final comment instead.
+  sections above is only for the legacy CTO-launched mode.) Put what you did in your final comment instead.
 * **Keep the change minimal.** Do not reformat files, re-pin or re-sort `package.json` versions, or touch
   anything the request does not need.
-* **Protect your context window — it is small, and overflow makes you lose your work.** Never print
-  `package-lock.json`, whole large files, YAML workflows, or full `git show` / `git diff` output. Use
-  `git diff --stat`, `git diff -- <one file> | head -80`, `sed -n '1,80p' <file>`, `grep -n`, and pipe long
-  output through `| head -40` / `| tail -40`. Read only the files the task names. (In one run three outputs
-  of 13–35 KB filled most of your memory and the run timed out with nothing finished.)
+* **Protect your context window — overflow makes you lose your work.** Never print `package-lock.json`, whole
+  large files, YAML workflows, or full `git show` / `git diff` output. Use `git diff --stat`,
+  `git diff -- <one file> | head -80`, `sed -n '1,80p' <file>`, `grep -n`, and pipe long output through
+  `| head -40` / `| tail -40`. Read only the files the task names.
 * **Work in small verified steps and commit each one** (`RSA-NN: <step>`), running the project's check
-  (`npm run typecheck`) after every step. Runs are cut off after 30 minutes and the next run starts with a
-  fresh memory: your commits and the issue comments are the only thing that carries over. Uncommitted work is
-  easy to lose or mangle.
+  (`npm run typecheck`) after every step. A run can be cut off, and the next run starts with a fresh memory:
+  your commits and the issue comments are the only things that carry over.
 * **Never delete a file to "start over" — edit it.** If the worktree looks confusing, first run
   `git status --short | head -20` and `git log --oneline -5`, and continue from the latest commit.
 * **New dependencies must be real.** Before adding an npm/pip package, verify it exists and is the official one
-  (`npm view <name> name version description`). An automatic build gate runs `npm install`, the type check
-  and the test suite on your worktree the moment you set `done`; if it fails, the issue comes straight back
-  to you with the error. Fix it and set `done` again.
+  (`npm view <name> name version description`).
+* **Before setting `done`, run the install, type check and tests yourself in the worktree.** No one else
+  builds your branch before Lynn tests it.
 * **Set your status by running a shell command in the terminal tool** — not as a tool name. There is no
-  tool called `paperclip_task` or `ram-task`; only the terminal command below exists. Your final comment
-  must say what you changed, which acceptance criteria it meets, and what you ran to verify it.
-* If the same issue keeps coming back and you cannot resolve it, set `blocked` and say what is stopping you.
+  tool called `paperclip_task` or `ram-task`; only the terminal command above exists. Your final comment must
+  give the branch, the worktree path, what you changed, which acceptance criteria it meets, and what you ran
+  to verify it. Lynn tests from that comment.
+* If you cannot finish, set `blocked`, say what is stopping you, and mention Ram (`[@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)`).
 
 ---
 

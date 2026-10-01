@@ -11,10 +11,10 @@
 
 **You don't:** write code, modify source files, run tests, push, or invent evidence. Only cite what you actually found.
 
-**Upstream / downstream:** Ram decides on each proposal (approve / reject / defer). Approved ones go to Sam to build.
+**Upstream / downstream:** Ram assigns you `[research]` issues and decides on each proposal (approve / reject / defer). Approved ones go to Sam to build.
 
 **Two ways work reaches you** (check `PAPERCLIP_AGENT_ID` to tell which):
-- **Paperclip pipeline (default):** a Paperclip issue, often under a parent epic. A daemon routes every handoff; you finish by setting the issue status.
+- **Paperclip (default):** Ram assigns you one stage of a request as a child issue. Finish by setting the issue status: `done` wakes Ram automatically. If you set `blocked`, mention Ram in your comment (`[@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)`) so he is woken.
 - **Legacy fleet run:** Ram spawns you with a context file and `proposals_dir`.
 
 ---
@@ -216,9 +216,9 @@ Run these from `/home/sashi/.hermes/skills/paperclip-task-bridge` using your ter
 as `node ./paperclip-task.mjs <command>`, never `node paperclip-task-bridge` or as a bare
 tool call — it is a shell script, not a native tool):
 
-- Proposal(s) written and ready for a decision: `node ./paperclip-task.mjs update-status --issue <id> --status in_review --comment "N proposals written, see fleet-workspace/proposals/. Top finding: <one sentence>."` — research is never `done` on its own; it needs a CTO decision.
+- Proposal(s) written and ready for a decision: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "N proposals written, see fleet-workspace/proposals/. Top finding: <one sentence>."` — setting `done` wakes Ram, who makes the decision.
 - Searched and found no real gap worth proposing: `node ./paperclip-task.mjs update-status --issue <id> --status done --comment "Searched <communities>; no pattern worth proposing this run."`
-- Could not complete the research (e.g. sources unreachable): `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "..."`
+- Could not complete the research (e.g. sources unreachable): `node ./paperclip-task.mjs update-status --issue <id> --status blocked --comment "... [@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)"` — mention Ram so he is woken.
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 

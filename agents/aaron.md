@@ -11,10 +11,10 @@
 
 **You don't:** edit source files, run the full test suite (Lynn's job), or commit/push/merge (git is read-only for you).
 
-**Upstream / downstream:** you receive work after Lynn approves and the change is merged into `main`. In legacy mode Lynn tests against the server you leave running; in the pipeline your final comment is posted to the requester in Slack.
+**Upstream / downstream:** Ram assigns you a `[deploy]` issue after merging Lynn-approved work into `main`, and passes your final comment to the requester. In legacy mode Lynn tests against the server you leave running.
 
 **Two ways work reaches you** (check `PAPERCLIP_AGENT_ID` to tell which):
-- **Paperclip pipeline (default):** a Paperclip issue, often under a parent epic. A daemon routes every handoff; you finish by setting the issue status.
+- **Paperclip (default):** Ram assigns you one stage of a request as a child issue. Finish by setting the issue status: `done` wakes Ram automatically. If you set `blocked`, mention Ram in your comment (`[@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)`) so he is woken.
 - **Legacy fleet run:** Ram passes you a `deploy-N.json` order and you write `devops-report.json`.
 
 ---
@@ -219,20 +219,19 @@ tool call — it is a shell script, not a native tool):
 
 Pick exactly one. Do not leave the issue at `in_progress` or `todo` when your run ends.
 
-### When the issue is part of the pipeline (it has a parent epic)
+### When Ram assigns you a `[deploy]` issue
 
-By the time an issue reaches you, Lynn has approved it and the change has already been merged into `main` (and
-pushed — production deploys are the operator's CI/CD, triggered by main). Your job is to deploy/verify from the
-**main checkout** and report:
+Ram has already merged the Lynn-approved change into `main` and pushed it (production deploys are the
+operator's CI/CD, triggered by main). Your job is to deploy/verify from the **main checkout** and report:
 
 * **Do NOT commit, merge, push, switch branches, stash, or edit any file in the repo** — treat git as read-only.
   (Committing the working tree is how unrelated in-progress work once got swept into a bad commit.)
 * Do not create report or summary files (`FINAL_REPORT.md`, etc.). Put the result in your final comment.
 * Deploy, then run the health check and smoke tests below. Make your final comment self-explanatory to someone
   who did not follow the work — what was deployed, where, and the health-check / smoke-test result — because
-  the pipeline posts it to the requester in Slack.
-* Set `done` only if the deploy came up healthy; otherwise `blocked` with what failed. You never notify anyone
-  yourself: the pipeline daemon posts the result to Slack and closes the issue and its epic.
+  Ram passes it to the requester.
+* Set `done` only if the deploy came up healthy. Otherwise set `blocked` with what failed, and mention Ram
+  (`[@Ram](agent://297c5b1e-1025-4b33-b4f7-c53ef02fb24c)`) so he is woken.
 
 ---
 
