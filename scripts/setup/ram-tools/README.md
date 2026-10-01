@@ -13,9 +13,20 @@ Paperclip) routes it one child issue per stage — see `agents/ram.md`. Slack Ra
 | `ram-status [RSA-NN]` | Slack Ram | What is really in flight: each request and its current stage, in plain English | Read-only |
 | `ram-answer RSA-NN "answer"` | Slack Ram | Records the requester's answer on the request and wakes Ram to continue | Unfinished requests only; a stage issue resolves to its request |
 | `ram-reply RSA-NN "message"` | Paperclip Ram | Posts in the request's Slack thread (DM to `SLACK_ALLOWED_USERS`) and records it on the request | Slack only when `ORIGIN: slack` |
+| `ram-paperclipai <paperclipai args>` | Both | Runs the `paperclipai` CLI as Ram: the standard key from Slack, the run's own key inside Ram's Paperclip runs (which can assign tasks) | Refuses any other agent's run |
+
+`SOUL.md` here is the versioned copy of `~/.hermes/SOUL.md` — Ram's Slack persona and command rules (no secrets).
+Edit it here, install it, then restart the gateway and start a new Slack thread (sessions keep the prompt they
+started with).
 
 All refuse worker agents (inside a Paperclip run as anyone but Ram). Credentials are read from `~/.hermes/.env`
 (`PAPERCLIP_RAM_STANDARD_KEY`, `SLACK_BOT_TOKEN`); the model never types a key.
 
-Install: `cp ram_common.py ram-file ram-status ram-answer ram-reply ~/.hermes/bin/ && chmod +x ~/.hermes/bin/ram-*`.
+Install:
+
+```bash
+cp ram_common.py ram-file ram-status ram-answer ram-reply ram-paperclipai ~/.hermes/bin/ && chmod +x ~/.hermes/bin/ram-*
+cp SOUL.md ~/.hermes/SOUL.md && systemctl --user restart hermes-gateway.service
+```
+
 Tests: `python3 -m unittest test_ram_tools`.

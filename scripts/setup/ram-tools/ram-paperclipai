@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Run `paperclipai` as Ram's standard (read-broad, non-approving) identity.
+# The key lives in ~/.hermes/.env (PAPERCLIP_RAM_STANDARD_KEY); this loads it so neither
+# SOUL.md nor the model ever has to type or expand a secret.
+#   usage: ram-paperclipai issue list -C <companyId> --json
+# Worker agents (inside a heartbeat run as anyone but Ram) are refused.
+set -euo pipefail
+ram_id=$(grep -m1 '^PAPERCLIP_AGENT_ID=' "$HOME/.hermes/.env" | cut -d= -f2-)
+if [ -n "${PAPERCLIP_RUN_ID:-}" ]; then
+  # Inside a Paperclip run: only Ram's own run may use this, and it uses the run's own key
+  # (Ram's identity, which can assign tasks) instead of the standard key.
+  [ "${PAPERCLIP_AGENT_ID:-}" = "$ram_id" ] && [ -n "${PAPERCLIP_API_KEY:-}" ] \
+    || { echo "ram-paperclipai is Ram-only; use the paperclip-task-bridge from your own run" >&2; exit 1; }
+  key=$PAPERCLIP_API_KEY
+else
+  key=$(grep -m1 '^PAPERCLIP_RAM_STANDARD_KEY=' "$HOME/.hermes/.env" | cut -d= -f2-)
+  [ -n "$key" ] || { echo "PAPERCLIP_RAM_STANDARD_KEY missing from ~/.hermes/.env" >&2; exit 1; }
+fi
+# ~/.hermes/.env has PAPERCLIP_API_URL=http://127.0.0.1:3100/api (the task-bridge style, WITH /api).
+# The paperclipai CLI appends /api itself, so passing that through makes every call hit
+# /api/api/... and 404 ("API route not found"). Let the CLI use its own default base.
+unset PAPERCLIP_API_URL
+exec paperclipai "$@" --api-key "$key"
