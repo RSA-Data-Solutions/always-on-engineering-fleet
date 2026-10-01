@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""ram-reply — tell the requester something about a request: a question, a blocker, or the final result.
+
+  ram-reply RSA-NN "message"
+
+Posts the message in the request's Slack thread (when it came from Slack) and records it as a comment on
+the request, so Slack and Paperclip stay in sync. Works from Slack and from Ram's own Paperclip runs.
+"""
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+import ram_common as rc
+
+
+def _main():
+    if len(sys.argv) < 3:
+        rc.die("usage: ram-reply RSA-NN \"message\"")
+    rc.refuse_in_worker()
+    ref, text = sys.argv[1], " ".join(sys.argv[2:]).strip()
+    if not text:
+        rc.die("the message is empty")
+    parent = rc.request_of(rc.resolve(ref))
+    desc = parent.get("description") or ""
+    slack = desc.lstrip().lower().startswith("origin: slack")
+    if slack:
+        rc.post_slack(f"{parent['identifier']}: {text}", rc.origin_thread(desc))
+    rc.cli("issue", "update", parent["id"], "--comment", f"Message to the requester{' (Slack)' if slack else ''}:\n\n{text}")
+    print(json.dumps({"status": "sent", "request": parent["identifier"], "slack": slack}))
+
+
+def main():
+    try:
+        _main()
+    except rc.RamError as e:
+        rc.die(str(e))
+
+
+if __name__ == "__main__":
+    main()

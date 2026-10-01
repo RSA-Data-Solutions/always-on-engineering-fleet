@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """ram-status — what is actually in flight. Report exactly what this prints; never guess.
 
-  ram-status            every unfinished pipeline request
-  ram-status RSA-30     one request in detail (recent history)
+  ram-status            every unfinished request and the stage it is at
+  ram-status RSA-30     one request in detail (stages + recent history)
 """
 import os
 import sys
@@ -14,23 +14,31 @@ import ram_common as rc
 def _main():
     rc.refuse_in_worker()
     if len(sys.argv) > 1:
-        i = rc.resolve(sys.argv[1])
-        cs = rc.comments(i["id"])
-        stage = rc.stage_of(cs)
-        print(f"{i['identifier']}  {i['title']}\nstatus: {i['status']}  |  {rc.where(i, stage)}\n\nRecent history:")
-        for c in cs[-6:]:
+        parent = rc.request_of(rc.resolve(sys.argv[1]))
+        kids = sorted((i for i in rc.cli("issue", "list", "-C", rc.COMPANY_ID) if i.get("parentId") == parent["id"]),
+                      key=lambda i: i.get("createdAt") or "")
+        open_kids = [k for k in kids if k["status"] in rc.OPEN]
+        print(f"{parent['identifier']}  {parent['title']}\nstatus: {parent['status']}  |  "
+              f"{rc.where(parent, open_kids[-1] if open_kids else None)}")
+        if kids:
+            print("\nStages:")
+            for k in kids:
+                print(f"- {k['identifier']}  {k['title'][:60]}  —  {k['status']} "
+                      f"({rc.AGENTS.get(k.get('assigneeAgentId') or '', 'unassigned')})")
+        print("\nRecent history:")
+        for c in rc.comments(parent["id"])[-6:]:
             who = rc.AGENTS.get(c.get("authorAgentId") or "", c.get("authorType") or "?")
             body = " ".join((c.get("body") or "").split())
             print(f"- [{c['createdAt'][5:16]}] {who}: {body[:260]}")
         return
-    items = rc.open_children()
-    if not items:
-        print("Nothing in flight: no unfinished pipeline requests.")
+    issues = rc.open_issues()
+    reqs = rc.open_requests(issues)
+    if not reqs:
+        print("Nothing in flight: no unfinished requests.")
         return
-    print(f"{len(items)} unfinished pipeline request(s):")
-    for i in items:
-        cs = rc.comments(i["id"])
-        print(f"- {i['identifier']}  {i['title'][:70]}  —  {rc.where(i, rc.stage_of(cs))}")
+    print(f"{len(reqs)} unfinished request(s):")
+    for r in reqs:
+        print(f"- {r['identifier']}  {r['title'][:70]}  —  {rc.where(r, rc.current_stage(r, issues))}")
 
 
 def main():
