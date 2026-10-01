@@ -211,8 +211,6 @@ Check pending approvals: `paperclipai approval list -C f7aed163-5581-400d-8661-b
 - **The "wake Ram when a child finishes" path is built but was not exercised live yet** — in the
   routing test Ram waited inside his first run instead. If Ram doesn't pick up the next stage on his
   own, check `agent_wakeup_requests` for `issue_children_completed`.
-- **Dhira's `worktreeMode: true`** failed at start outside a git repo in the previous install; it is
-  set again on the new Dhira.
 - **LAN exposure of the Paperclip UI from other devices has been unreliable** — loopback access (via
   SSH/VS Code port-forwarding) is the confirmed-working path. Not root-caused.
 - **`hooks_auto_accept: true`** is enabled for the Hermes gateway so it can run shell commands without
